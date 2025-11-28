@@ -1,6 +1,6 @@
 {
   "name": "@git-ai/cli",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "一个基于 AI 的 Git 提交消息生成器 CLI 工具，可自动分析代码变更并生成符合规范的提交信息",
   "type": "module",
   "bin": {
@@ -45,6 +45,7 @@
     "lint:fix": "eslint . --ext .js,.mjs,.cjs --fix",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
+    "version:bump": "node scripts/bump-version.mjs",
     "prepare": "husky install",
     "prepublishOnly": "npm run lint && npm run format"
   },
