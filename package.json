@@ -1,6 +1,6 @@
 {
   "name": "@git-ai/cli",
-  "version": "1.0.5",
+  "version": "1.0.4",
   "description": "一个基于 AI 的 Git 提交消息生成器 CLI 工具，可自动分析代码变更并生成符合规范的提交信息",
   "type": "module",
   "bin": {
