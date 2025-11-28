@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+tmp/
+temp/
+.vscode/
+.idea/
+
+

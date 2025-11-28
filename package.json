@@ -1,0 +1,72 @@
+{
+  "name": "@git-ai/cli",
+  "version": "1.0.2",
+  "description": "一个基于 AI 的 Git 提交消息生成器 CLI 工具，可自动分析代码变更并生成符合规范的提交信息",
+  "type": "module",
+  "bin": {
+    "git-ai": "bin/index.cjs"
+  },
+  "keywords": [
+    "git",
+    "ai",
+    "commit",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "homepage": "https://github.com/code-ba/git-ai",
+  "bugs": {
+    "url": "https://github.com/code-ba/git-ai/issues",
+    "email": "info@cxvh.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": {
+    "name": "Baran",
+    "email": "info@cxvh.com",
+    "url": "https://github.com/code-ba"
+  },
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint . --ext .js,.mjs,.cjs",
+    "lint:fix": "eslint . --ext .js,.mjs,.cjs --fix",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "prepare": "husky install",
+    "prepublishOnly": "npm run lint && npm run format"
+  },
+  "dependencies": {
+    "axios": "1.13.1",
+    "chalk": "4.1.2",
+    "cli-spinner": "0.2.10",
+    "commander": "9.5.0",
+    "configstore": "6.0.0",
+    "inquirer": "7.3.3",
+    "npmlog": "6.0.2"
+  },
+  "devDependencies": {
+    "eslint": "8.57.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "2.8.8"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
