@@ -1,11 +1,10 @@
-import { chat, getModelList } from '../utils/OpenAI.mjs';
+import { getModelList } from '../utils/OpenAI.mjs';
 import { config } from '../utils/Storage.mjs';
 import inquirer from 'inquirer';
 import { BIN } from '../const.mjs';
 import Logger from '../utils/Logger.mjs';
 import Spinner from '../utils/Spinner.mjs';
 import BaseAction from './BaseAction.mjs';
-import { formatMessage } from '../utils/MessageUtils.mjs';
 class SetModelAction extends BaseAction {
   constructor(modelId) {
     super(modelId);
@@ -58,46 +57,6 @@ class SetModelAction extends BaseAction {
       throw error && error.message ? error.message : error;
     }
   }
-  // 验证模型是否可用
-  async validateModel() {
-    const spinner = new Spinner('正在验证模型是否可用...');
-    spinner.start();
-
-    const startTimestamp = Date.now();
-    const configModel = config.get('model') ? config.get('model').split(',') : [];
-    if (!this.baseURL || !configModel.length) return;
-    const total = configModel.length;
-    const errTotal = [];
-    while (configModel.length) {
-      const model = configModel.shift();
-      try {
-        const result = await chat({
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: '1+1=?',
-            },
-          ],
-        });
-        formatMessage(result);
-      } catch {
-        errTotal.push(model);
-      }
-    }
-    spinner.stop();
-    if (total - errTotal.length > 0) {
-      Logger.success(`模型验证通过 ${total - errTotal.length} 个`);
-    }
-    if (errTotal.length) {
-      Logger.error(`模型验证失败 ${errTotal.length} 个，分别是：\n${errTotal.join('\n   - ')}`);
-    }
-
-    const endTimestamp = Date.now();
-    const duration = endTimestamp - startTimestamp;
-
-    Logger.success(`本次检查模型用时: ${(duration / 1000).toFixed(3)} 秒`);
-  }
   async execute() {
     config.set('model', this.modelId);
     if (!this.modelId && this.defaultModel) {
@@ -112,7 +71,7 @@ class SetModelAction extends BaseAction {
     if (this.modelId) {
       Logger.success(`已设置模型: \n   - ${this.modelId.split(`,`).join('\n   - ')}`);
     }
-    await this.validateModel();
+    // await this.validateModel();
   }
 }
 

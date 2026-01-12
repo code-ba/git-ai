@@ -1,4 +1,4 @@
-import { chat, freeChat } from '../utils/OpenAI.mjs';
+import { chat } from '../utils/OpenAI.mjs';
 import { generateSystemMessage, formatCompletions } from '../utils/MessageUtils.mjs';
 import { config } from '../utils/Storage.mjs';
 import chalk from 'chalk';
@@ -22,8 +22,7 @@ export class AIService {
    * 生成提交消息
    */
   async generateCommitMessage(diffString) {
-    const request = this.checkConfig() ? chat : freeChat;
-    const result = await request({
+    const result = await chat({
       messages: [
         {
           role: 'system',
@@ -54,7 +53,6 @@ export class AIService {
    */
   async analyzeCommitFailure({ errorMessage = '', gitStatus = '', hookLogs = '' } = {}) {
     this.usageMessage = '';
-    const request = this.checkConfig() ? chat : freeChat;
     const contextParts = [];
     if (errorMessage) {
       contextParts.push(`Git 命令报错：\n${errorMessage}`);
@@ -69,7 +67,7 @@ export class AIService {
       ? contextParts.join('\n\n')
       : '未提供额外日志，只知道 git commit 失败。';
 
-    const result = await request({
+    const result = await chat({
       messages: [
         {
           role: 'system',

@@ -1,16 +1,11 @@
 import axios from 'axios';
 import { config } from './Storage.mjs';
-import { OPENAI_TIMEOUT, OPENAI_FREE_BASE_URL, OPENAI_FREE_MODEL_ID } from '../const.mjs';
-import { getDeviceId, getOpenAiConfig, getRandomItem } from './Utils.mjs';
+import { OPENAI_TIMEOUT } from '../const.mjs';
+import { getOpenAiConfig } from './Utils.mjs';
 
 export const headers = {
   Accept: 'application/json',
   'Content-Type': 'application/json',
-};
-export const getFreeModelInfo = async () => {
-  return axios.get(
-    `https://api2.immersivetranslate.com/big-model/get-token?deviceId=${getDeviceId()}`
-  );
 };
 export const getModelList = (options) => {
   const conf = {};
@@ -56,9 +51,4 @@ export const chat = (data, baseURL, apiKey) => {
       ...data,
     },
   });
-};
-export const freeChat = async (data) => {
-  const config = await getFreeModelInfo();
-  data.model = getRandomItem(OPENAI_FREE_MODEL_ID);
-  return chat(data, OPENAI_FREE_BASE_URL, config.data.apiToken);
 };

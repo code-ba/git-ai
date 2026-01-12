@@ -17,10 +17,9 @@ import { collectError, collectWarning } from '../utils/Log.mjs';
  * 负责处理 git commit 的完整流程
  */
 class CommitAction extends BaseAction {
-  constructor({ dryRun, allowEmpty, noVerify, skip }) {
-    super({ dryRun, allowEmpty, noVerify, skip });
+  constructor({ allowEmpty, noVerify, skip }) {
+    super({ allowEmpty, noVerify, skip });
 
-    this.dryRun = dryRun;
     this.allowEmpty = allowEmpty;
     this.noVerify = noVerify;
     this.skip = skip;
@@ -377,7 +376,7 @@ class CommitAction extends BaseAction {
    * Git merge
    */
   gitMerge() {
-    Logger.info('正在检测是否需要拉取...');
+    Logger.info('正在检测是否需要合并...');
     try {
       const aheadCount = this.gitService.getAheadCount(this.remoteName, this.currentBranch);
       if (aheadCount > 0) {

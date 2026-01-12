@@ -5,7 +5,6 @@ import TokenAction from './actions/TokenAction.mjs';
 import BaseUrlAction from './actions/BaseUrlAction.mjs';
 import MaxTokenAction from './actions/MaxTokenAction.mjs';
 import { exitProcess } from './utils/Utils.mjs';
-import SelectModelAction from './actions/SelectModelAction.mjs';
 import { BIN, VERSION, DESCRIPTION, NAME, OPENAI_MAX_TOKEN_DEFAULT, asciiArt } from './const.mjs';
 import Logger from './utils/Logger.mjs';
 import chalk from 'chalk';
@@ -15,8 +14,6 @@ function registerCommand() {
   const program = new Command();
   program
     .name(BIN)
-    // .description(`${asciiArt}`)
-    // .description(`${asciiArt}\n${DESCRIPTION}`)
     .version(VERSION)
     .helpOption(
       '-h',
@@ -49,13 +46,8 @@ function registerCommand() {
     )
     .action(MaxTokenAction);
   program
-    .command('select-model')
-    .description(`从模型列表选择，请执行 ${chalk.cyan('`' + BIN + ' select-model`')}`)
-    .action(SelectModelAction);
-  program
-    .option('-d, --dry-run', `等同于 ${chalk.cyan('`git commit --dry-run -m <message>`')}`)
-    .option('-e, --allow-empty', `等同于 ${chalk.cyan('`git commit --allow-empty -m <message>`')}`)
-    .option('-n, --no-verify', `等同于 ${chalk.cyan('`git commit --no-verify -m <message>`')}`)
+    .option('-e, --allowEmpty', `等同于 ${chalk.cyan('`git commit --allow-empty -m <message>`')}`)
+    .option('-n, --noVerify', `等同于 ${chalk.cyan('`git commit --no-verify -m <message>`')}`)
     .option(
       '-s, --skip',
       `跳过 ${chalk.cyan('`git add`')} 命令, 只提交已暂存的更改，如：${chalk.cyan(

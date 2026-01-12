@@ -8,4 +8,5 @@ temp/
 .eslintcache
 .vscode/
 .idea/
+.claude/
 

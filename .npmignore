@@ -12,4 +12,5 @@ temp/
 test/
 tests/
 .github/
+.claude/
 

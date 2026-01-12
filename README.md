@@ -42,18 +42,16 @@ git ai
 
 ## 📖 常用命令
 
-| 命令 | 说明 |
-|------|------|
-| `git ai` | 生成并提交 |
-| `git ai -d, --dryRun` | 测试模式（不实际提交） |
-| `git ai -e, --allowEmpty` | 允许空提交 |
-| `git ai -n, --noVerify` | 跳过 Git hooks |
-| `git ai -s, --skip` | 跳过 git add |
-| `git ai set-baseURL <url>` | 设置 API 地址 |
-| `git ai set-key <key>` | 设置 API 密钥 |
-| `git ai set-model <model>` | 设置模型 |
+| 命令                         | 说明              |
+| ---------------------------- | ----------------- |
+| `git ai`                     | 生成并提交        |
+| `git ai -e, --allowEmpty`    | 允许空提交        |
+| `git ai -n, --noVerify`      | 跳过 Git hooks    |
+| `git ai -s, --skip`          | 跳过 git add      |
+| `git ai set-baseURL <url>`   | 设置 API 地址     |
+| `git ai set-key <key>`       | 设置 API 密钥     |
+| `git ai set-model <model>`   | 设置模型          |
 | `git ai set-max-token <num>` | 设置最大 token 数 |
-| `git ai select-model` | 交互式选择模型 |
 
 ## ⚙️ 配置说明
 
@@ -68,25 +66,6 @@ git ai set-key key1,key2,key3
 
 # 多个模型（随机选择）
 git ai set-model gpt-4,claude-3,gemini-pro
-```
-
-### select-model 环境变量
-
-使用 `git ai select-model` 前需设置：
-
-```bash
-export OPENAI_MODEL_LIST_URL="https://raw.githubusercontent.com/xx025/carrot/main/model_list.json"
-```
-
-JSON 格式：
-```json
-{
-  "data": [{
-    "id": "model1,model2",
-    "baseURL": "url1,url2",
-    "keys": "key1,key2"
-  }]
-}
 ```
 
 ## 🔧 工作流程
@@ -106,23 +85,31 @@ JSON 格式：
 **类型**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
 
 **示例**:
+
 ```sh
+$ git ai
+git-ai verb @git-ai/cli@1.0.0
+git-ai verb 按 Ctrl+C 退出...
+git-ai success AI 生成的内容：
+docs(John): 更新文档和代码格式规范
 
+- 添加了 select-model 命令的环境变量配置说明
+- 统一了代码中的引号使用为双引号
+- 修复了 package.json 中缺少的 access 字段
+- 规范化了代码缩进和格式
+git-ai info 本次模型消耗统计：总数 17050 tokens、输入 16977 tokens、输出 73 tokens
+git-ai success git commit 提交成功...
+git-ai info 获取 git 远程仓库地址
+git-ai success 获取 git 远程仓库地址成功
+git-ai info 获取远程仓库最新状态，执行 git fetch...
+git-ai success 远程分支 origin 的最新更改状态获取成功
+git-ai info 正在检测是否需要拉取...
+git-ai success 本地代码是最新，无需合并
+git-ai info 正在推送本地分支与远程分支的差异...
+git-ai success 本地分支与远程分支的差异已推送。
+git-ai verb 日志地址: C:\Users\用户名\.config\git-ai\cli\logs\2025-11\log-2025-11-22_10-56-59.txt
+git-ai verb 本次执行指令耗时: 14.481 秒，程序退出...
 ```
-
-## 🔍 故障排除
-
-**git 用户信息错误**:
-```bash
-git config user.name "Your Name"
-```
-
-**token 数超限**:
-```bash
-git ai set-max-token 256000
-```
-
-**网络/API 错误**: 检查网络连接、API Key 和 Base URL
 
 ## 📋 系统要求
 
@@ -132,4 +119,3 @@ git ai set-max-token 256000
 ## 📄 许可证
 
 MIT License
-

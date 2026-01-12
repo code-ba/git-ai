@@ -11,15 +11,9 @@ export const DESCRIPTION = pkg.description;
 export const VERSION = pkg.version;
 export const AUTHOR = pkg.author;
 export const LOWEST_NODE_VERSION = pkg.engines.node;
-export const OPENAI_BASE_URL = ''; //"https://api.siliconflow.cn/v1"
-export const OPENAI_API_KEYS_URL = ''; //"https://cloud.siliconflow.cn/me/account/ak"
-export const OPENAI_MODELS_URL = ''; //"https://cloud.siliconflow.cn/me/models"
-export const OPENAI_MODEL_DEFAULT = ''; // "Qwen/Qwen2.5-Coder-7B-Instruct"
 export const OPENAI_TIMEOUT = 60 * 1000 * 3;
 export const OPENAI_MAX_TOKEN_DEFAULT = 128000;
 export const OPENAI_MODEL_LIST_URL = process.env.OPENAI_MODEL_LIST_URL;
-export const OPENAI_FREE_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
-export const OPENAI_FREE_MODEL_ID = 'glm-4-flash-250414,glm-4.5-flash';
 export const OPENAI_COMMIT_MESSAGE_TYPES = [
   'feat',
   'fix',
