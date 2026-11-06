@@ -24,13 +24,21 @@ npm install -g @git-ai/cli
 
 ## 🚀 快速开始
 
-### 1. 配置 API
+### 1. 初始化配置
 
 ```bash
-git ai set-baseURL https://api.siliconflow.cn/v1
-git ai set-key your-api-key
-git ai set-model Qwen/Qwen2.5-Coder-7B-Instruct
+git ai init
 ```
+
+按提示依次完成配置：
+
+1. **请求类型**：`chat`（OpenAI 兼容，默认）/ `responses`（OpenAI Responses）/ `anthropic`（Anthropic Claude）
+2. **baseURL**：API 地址，如 `https://api.siliconflow.cn/v1`
+3. **key**：API 密钥（回显时自动掩码）
+4. **model**：从接口拉取模型列表多选（拉取失败时降级为手动输入）
+5. **max-token**：最大 token 数
+
+已配置的项会回显在输入位置上方，直接回车保持当前值；未配置的项必填。
 
 ### 2. 生成提交
 
@@ -42,30 +50,29 @@ git ai
 
 ## 📖 常用命令
 
-| 命令                         | 说明              |
-| ---------------------------- | ----------------- |
-| `git ai`                     | 生成并提交        |
-| `git ai -e, --allowEmpty`    | 允许空提交        |
-| `git ai -n, --noVerify`      | 跳过 Git hooks    |
-| `git ai -s, --skip`          | 跳过 git add      |
-| `git ai set-baseURL <url>`   | 设置 API 地址     |
-| `git ai set-key <key>`       | 设置 API 密钥     |
-| `git ai set-model <model>`   | 设置模型          |
-| `git ai set-max-token <num>` | 设置最大 token 数 |
+| 命令                      | 说明                  |
+| ------------------------- | --------------------- |
+| `git ai`                  | 生成并提交            |
+| `git ai -e, --allowEmpty` | 允许空提交            |
+| `git ai -n, --noVerify`   | 跳过 Git hooks        |
+| `git ai --noAdd`          | 跳过 git add          |
+| `git ai -s, --sign`       | GPG 签名提交          |
+| `git ai init`             | 交互式初始化/更新配置 |
 
 ## ⚙️ 配置说明
 
 ### 多 API/模型支持
 
+`git ai init` 时按以下方式配置多项（随机选择）：
+
 ```bash
-# 多个地址（随机选择）
-git ai set-baseURL https://api1.com/v1,https://api2.com/v1
+# baseURL 输入多个地址，英文逗号隔开
+https://api1.com/v1,https://api2.com/v1
 
-# 多个密钥（随机选择）
-git ai set-key key1,key2,key3
+# key 输入多个密钥，英文逗号隔开
+key1,key2,key3
 
-# 多个模型（随机选择）
-git ai set-model gpt-4,claude-3,gemini-pro
+# model 在接口列表中勾选多个
 ```
 
 ## 🔧 工作流程
@@ -77,12 +84,14 @@ git ai set-model gpt-4,claude-3,gemini-pro
 ## 📝 提交消息格式
 
 ```
-<type>(<username>): <description>
+<type>(<scope>): <subject>
 
 [详细说明]
 ```
 
 **类型**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+**scope**: 由 AI 根据变更内容自动生成（模块名、文件名或功能域）
 
 **示例**:
 
@@ -91,7 +100,7 @@ $ git ai
 git-ai verb @git-ai/cli@1.0.0
 git-ai verb 按 Ctrl+C 退出...
 git-ai success AI 生成的内容：
-docs(John): 更新文档和代码格式规范
+docs(readme): 更新文档和代码格式规范
 
 - 添加了 select-model 命令的环境变量配置说明
 - 统一了代码中的引号使用为双引号

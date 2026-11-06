@@ -7,8 +7,7 @@ import chalk from 'chalk';
  * 封装所有 AI 相关操作
  */
 export class AIService {
-  constructor(userName) {
-    this.userName = userName;
+  constructor() {
     this.usageMessage = '';
   }
   // 检查是否配置 baseUrl model
@@ -26,7 +25,7 @@ export class AIService {
       messages: [
         {
           role: 'system',
-          content: generateSystemMessage(this.userName),
+          content: generateSystemMessage(),
         },
         { role: 'user', content: diffString },
       ],
@@ -38,6 +37,50 @@ export class AIService {
     if (result.data.usage) {
       this.usageMessage = chalk.underline(
         `本次模型消耗统计：总数 ${result.data.usage.total_tokens} tokens、输入 ${result.data.usage.prompt_tokens} tokens、输出 ${result.data.usage.completion_tokens} tokens`
+      );
+    }
+
+    return formatCompletions(result);
+  }
+
+  /**
+   * 让模型修复不符合格式的提交消息（借鉴 langchain OutputFixingParser）
+   * 将格式指令（system）、原始输出与错误信息一并喂回模型，自动修复一次
+   * @param {string} originalOutput 首次生成的不符合格式的原始输出
+   * @param {string} error 解析失败的错误信息
+   */
+  async fixCommitMessage(originalOutput, error) {
+    const result = await chat({
+      messages: [
+        {
+          role: 'system',
+          content: generateSystemMessage(),
+        },
+        {
+          role: 'user',
+          content: `Completion:
+--------------
+${originalOutput}
+--------------
+
+Above, the Completion did not satisfy the constraints given in the Instructions.
+Error:
+--------------
+${error}
+--------------
+
+Please try again. Please only respond with an answer that satisfies the constraints laid out in the Instructions:`,
+        },
+      ],
+    });
+
+    if (result.data && result.data.error && !result.data.choices) {
+      throw result.data.error;
+    }
+
+    if (result.data.usage) {
+      this.usageMessage = chalk.underline(
+        `本次模型消耗统计（含格式修复调用）：总数 ${result.data.usage.total_tokens} tokens、输入 ${result.data.usage.prompt_tokens} tokens、输出 ${result.data.usage.completion_tokens} tokens`
       );
     }
 

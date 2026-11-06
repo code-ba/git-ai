@@ -1,7 +1,27 @@
 import { isAxiosError } from 'axios';
 import { config } from '../utils/Storage.mjs';
-import { BIN, OPENAI_COMMIT_MESSAGE_TYPES, OPENAI_MAX_TOKEN_DEFAULT } from '../const.mjs';
-import { formatMessage } from '../utils/MessageUtils.mjs';
+import {
+  BIN,
+  OPENAI_COMMIT_MESSAGE_TYPES,
+  OPENAI_MAX_TOKEN_DEFAULT,
+  CHECK_GITIGNORE_ENABLE,
+  CHECK_DEPENDENCIES_ENABLE,
+  CHECK_LARGE_FILES_ENABLE,
+  CHECK_CACHE_FILES_ENABLE,
+  CHECK_BUILD_ARTIFACTS_ENABLE,
+  LARGE_FILE_WARN_SIZE,
+  LARGE_FILE_CONFIRM_SIZE,
+  SKIP_LARGE_FILE_CONFIRM_KEY,
+} from '../const.mjs';
+import {
+  checkGitignoreExists,
+  findDependencyFiles,
+  findCacheFiles,
+  findBuildArtifacts,
+  findLargeFiles,
+  formatFileSize,
+} from '../utils/CheckUtils.mjs';
+import { parseCommitMessage, buildCommitMessage } from '../utils/MessageUtils.mjs';
 import { findConflictFiles } from '../utils/ConflictUtils.mjs';
 import { GitService } from '../services/GitService.mjs';
 import { AIService } from '../services/AIService.mjs';
@@ -17,12 +37,13 @@ import { collectError, collectWarning } from '../utils/Log.mjs';
  * 负责处理 git commit 的完整流程
  */
 class CommitAction extends BaseAction {
-  constructor({ allowEmpty, noVerify, skip }) {
-    super({ allowEmpty, noVerify, skip });
+  constructor({ allowEmpty, noVerify, noAdd, sign }) {
+    super({ allowEmpty, noVerify, noAdd, sign });
 
     this.allowEmpty = allowEmpty;
     this.noVerify = noVerify;
-    this.skip = skip;
+    this.noAdd = noAdd;
+    this.sign = sign;
     // 是否有冲突文件
     this.isConflit = false;
 
@@ -35,7 +56,7 @@ class CommitAction extends BaseAction {
 
     // 工作信息
     this.workingPrefix = '';
-    this.userName = '';
+    this.repoRoot = '';
     this.diffString = '';
     this.commitCommand = '';
     this.commitMessage = '';
@@ -51,19 +72,38 @@ class CommitAction extends BaseAction {
     this.prepare();
     this.gitService.checkInstalled();
     this.gitService.checkRepository();
+    this.checkSign();
     this.checkWorkingPrefix();
-    this.checkGitConflict();
+    await this.checkGitConflict();
     await this.addCommand();
-    this.commitMerge();
-    this.getGitUserInfo();
-    this.getDiffString();
+    await this.checkStagedFiles();
+    await this.commitMerge();
+    this.initCommitMessageRegexp();
+    await this.getDiffString();
     await this.commit();
     this.getBranchInfo();
     await this.getRemoteInfo();
-    this.gitFetch();
-    this.gitMerge();
-    this.checkGitConflict();
-    this.push();
+    await this.gitFetch();
+    await this.gitMerge();
+    await this.checkGitConflict();
+    await this.push();
+  }
+
+  /**
+   * 在 spinner 中执行异步任务：给耗时操作提供转动反馈
+   * 正常结束先停止 spinner 再打印 success 日志（否则步骤无感知、页面闪烁），异常时原样抛出由上层处理
+   */
+  async runWithSpinner(text, task, doneText) {
+    const spinner = new Spinner(text);
+    spinner.start();
+    let result;
+    try {
+      result = await task();
+    } finally {
+      spinner.stop();
+    }
+    Logger.success(doneText || `${text.replace(/^正在/, '').replace(/\.{2,}$/, '')}完成`);
+    return result;
   }
 
   /**
@@ -81,6 +121,23 @@ class CommitAction extends BaseAction {
   }
 
   /**
+   * 检查 GPG 签名：存在与 user.email 匹配的私钥则签名提交（git commit -S），否则警告后按普通方式提交
+   */
+  checkSign() {
+    if (!this.sign) return;
+    const email = this.gitService.getUserEmail();
+    if (email && this.gitService.hasGpgKeyForEmail(email)) {
+      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit -S');
+      return;
+    }
+    Logger.warn(
+      email
+        ? `未找到与 ${email} 匹配的 GPG 私钥，本次提交将不签名`
+        : '未配置 user.email，无法匹配 GPG 私钥，本次提交将不签名'
+    );
+  }
+
+  /**
    * 检查工作目录
    */
   checkWorkingPrefix() {
@@ -93,9 +150,13 @@ class CommitAction extends BaseAction {
   /**
    * 检查 Git 冲突
    */
-  checkGitConflict() {
+  async checkGitConflict() {
     // 检查状态
-    const statusOutput = this.gitService.getStatus();
+    const statusOutput = await this.runWithSpinner(
+      '正在检测工作区状态...',
+      () => this.gitService.getStatus(),
+      '工作区状态检测完成'
+    );
     const lines = statusOutput.trim().split('\n');
     let modified = [];
     // 冲突文件列表
@@ -156,31 +217,215 @@ class CommitAction extends BaseAction {
     if (this.isConflit && !(await this.confirmConflict())) {
       throw '请手动解决冲突';
     }
-    if (this.skip) return;
-    this.gitService.add();
+    if (this.noAdd) return;
+    this.checkGitignore();
+    await this.runWithSpinner(
+      '正在执行 git add...',
+      () => this.gitService.add(),
+      'git add 执行完成'
+    );
     if (!this.isConflit) return;
-    this.checkGitConflict();
+    await this.checkGitConflict();
   }
 
   /**
-   * 获取 Git 用户信息
+   * 检测 .gitignore（git add 之前），不存在则告警提示
    */
-  getGitUserInfo() {
-    this.userName = this.gitService.getUserName();
-    if (this.userName) {
-      this.OPENAI_COMMIT_MESSAGE_REGEXP = new RegExp(
-        `^((${OPENAI_COMMIT_MESSAGE_TYPES.join('|')})\\(${this.userName}\\)):[\\s\\S]*`
-      );
+  checkGitignore() {
+    if (!CHECK_GITIGNORE_ENABLE) return;
+    try {
+      this.repoRoot = this.gitService.getRepoRoot();
+    } catch (error) {
+      collectWarning(error);
       return;
     }
-    throw `获取 git 用户信息时出错，\n  请执行 \`git config user.name <your name>\` 设置 git 用户名`;
+    if (!checkGitignoreExists(this.repoRoot)) {
+      Logger.warn('未检测到 .gitignore 文件，建议添加，避免将依赖包、大文件等提交到仓库');
+    }
+  }
+
+  /**
+   * 提交前检测暂存区：缓存文件（告警）、依赖包/构建产物/压缩包（需确认）、大文件（告警+确认）
+   */
+  async checkStagedFiles() {
+    if (
+      !CHECK_DEPENDENCIES_ENABLE &&
+      !CHECK_LARGE_FILES_ENABLE &&
+      !CHECK_CACHE_FILES_ENABLE &&
+      !CHECK_BUILD_ARTIFACTS_ENABLE
+    ) {
+      return;
+    }
+
+    let stagedFiles = [];
+    try {
+      stagedFiles = await this.runWithSpinner(
+        '正在分析暂存区文件...',
+        () => this.gitService.getStagedFiles(),
+        '暂存区文件分析完成'
+      );
+    } catch (error) {
+      collectWarning(error);
+      return;
+    }
+    if (!stagedFiles.length) return;
+
+    if (!this.repoRoot) {
+      try {
+        this.repoRoot = this.gitService.getRepoRoot();
+      } catch (error) {
+        collectWarning(error);
+      }
+    }
+
+    // 检测缓存/临时文件，仅告警不阻断
+    if (CHECK_CACHE_FILES_ENABLE) {
+      this.checkCacheFiles(stagedFiles);
+    }
+    // 检测依赖包目录，用户确认提交后才会继续检测后续项
+    if (CHECK_DEPENDENCIES_ENABLE) {
+      await this.checkDependencies(stagedFiles);
+    }
+    // 检测构建产物目录与压缩包文件
+    if (CHECK_BUILD_ARTIFACTS_ENABLE) {
+      await this.checkBuildArtifacts(stagedFiles);
+    }
+    if (CHECK_LARGE_FILES_ENABLE) {
+      await this.checkLargeFiles(stagedFiles);
+    }
+  }
+
+  /**
+   * 格式化检测结果展示列表：目录按聚合展示，散落文件单独列出（最多 10 条）
+   */
+  formatCheckResult(dirs, files) {
+    const dirLines = dirs.map((item) => `  - ${item.dir}（${item.count} 个文件）`);
+    const standaloneFiles = files.filter(
+      (file) => !dirs.some((item) => file.startsWith(`${item.dir}/`))
+    );
+    const fileLines = standaloneFiles
+      .slice(0, 10)
+      .map((file) => `  - ${file}`)
+      .concat(standaloneFiles.length > 10 ? [`  ...等共 ${standaloneFiles.length} 个文件`] : []);
+    return [...dirLines, ...fileLines].join('\n');
+  }
+
+  /**
+   * 检测缓存/临时/系统垃圾文件：仅告警提示建议加入 .gitignore，不阻断提交
+   */
+  checkCacheFiles(stagedFiles) {
+    const { dirs, files } = findCacheFiles(stagedFiles);
+    if (!files.length) return;
+    Logger.warn(
+      `检测到缓存/临时文件，建议加入 .gitignore：\n${this.formatCheckResult(dirs, files)}`
+    );
+  }
+
+  /**
+   * 检测构建产物目录与压缩包文件：列出后询问确认，默认 N，取消则中止提交
+   */
+  async checkBuildArtifacts(stagedFiles) {
+    const { dirs, files } = findBuildArtifacts(stagedFiles);
+    if (!dirs.length && !files.length) return;
+
+    Logger.warn(`检测到正在提交构建产物或压缩包文件：\n${this.formatCheckResult(dirs, files)}`);
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: '确认提交以上构建产物/压缩包文件？',
+        default: false,
+      },
+    ]);
+    if (!confirm) {
+      throw '已取消提交，建议将构建产物目录和压缩包文件加入 .gitignore';
+    }
+  }
+
+  /**
+   * 检测依赖包目录：列出目录询问确认，默认 N，取消则中止提交
+   */
+  async checkDependencies(stagedFiles) {
+    const { depDirs } = findDependencyFiles(stagedFiles);
+    if (!depDirs.length) return;
+
+    const dirList = depDirs.map((item) => `  - ${item.dir}（${item.count} 个文件）`).join('\n');
+    Logger.warn(`检测到正在提交依赖包目录：\n${dirList}`);
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: '确认提交以上依赖包目录？',
+        default: false,
+      },
+    ]);
+    if (!confirm) {
+      throw '已取消提交，建议将依赖包目录加入 .gitignore 后重试';
+    }
+  }
+
+  /**
+   * 检测大文件：超过 LARGE_FILE_WARN_SIZE 告警提示，超过 LARGE_FILE_CONFIRM_SIZE 需用户确认
+   * 用户确认一次后，以后都跳过超过 LARGE_FILE_CONFIRM_SIZE 的大文件检测（阈值见 const.mjs）
+   */
+  async checkLargeFiles(stagedFiles) {
+    const { warnFiles, confirmFiles } = await this.runWithSpinner(
+      '正在检测大文件...',
+      () => findLargeFiles(stagedFiles, this.repoRoot),
+      '大文件检测完成'
+    );
+    const warnSizeText = formatFileSize(LARGE_FILE_WARN_SIZE);
+    const confirmSizeText = formatFileSize(LARGE_FILE_CONFIRM_SIZE);
+
+    if (warnFiles.length) {
+      const fileList = warnFiles
+        .map((item) => `  - ${item.file}（${formatFileSize(item.size)}）`)
+        .join('\n');
+      Logger.warn(`检测到 ${warnFiles.length} 个大文件（超过 ${warnSizeText}）：\n${fileList}`);
+    }
+
+    if (!confirmFiles.length) return;
+    // 用户此前已确认过（记录在当前仓库的 .git/config），跳过超过确认阈值的大文件检测
+    if (this.gitService.getLocalConfig(SKIP_LARGE_FILE_CONFIRM_KEY) === 'true') return;
+
+    const fileList = confirmFiles
+      .map((item) => `  - ${item.file}（${formatFileSize(item.size)}）`)
+      .join('\n');
+    Logger.warn(`检测到超大文件（超过 ${confirmSizeText}）：\n${fileList}`);
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: `确认提交以上超大文件？确认后当前仓库以后将跳过 ${confirmSizeText} 以上大文件检测`,
+        default: false,
+      },
+    ]);
+    if (!confirm) {
+      throw '已取消提交，建议将超大文件加入 .gitignore 或使用 Git LFS 管理';
+    }
+    // 仅记录在当前仓库的 .git/config，不影响其他项目
+    this.gitService.setLocalConfig(SKIP_LARGE_FILE_CONFIRM_KEY, 'true');
+    Logger.info(`已记录（仅当前仓库）：以后将跳过 ${confirmSizeText} 以上大文件检测`);
+  }
+
+  /**
+   * 初始化提交消息校验正则（scope 由 AI 生成，匹配任意值）
+   */
+  initCommitMessageRegexp() {
+    this.OPENAI_COMMIT_MESSAGE_REGEXP = new RegExp(
+      `^((${OPENAI_COMMIT_MESSAGE_TYPES.join('|')})\\([^)]*\\))!?:[\\s\\S]*`
+    );
   }
 
   /**
    * 获取差异字符串
    */
-  getDiffString() {
-    this.diffString = this.gitService.getDiff(this.maxToken);
+  async getDiffString() {
+    this.diffString = await this.runWithSpinner(
+      '正在获取代码差异...',
+      () => this.gitService.getDiff(this.maxToken),
+      '代码差异获取完成'
+    );
   }
 
   /**
@@ -194,10 +439,24 @@ class CommitAction extends BaseAction {
 
     try {
       // 初始化 AI 服务
-      this.aiService = new AIService(this.userName);
+      this.aiService = new AIService();
       const result = await this.aiService.generateCommitMessage(this.diffString);
       spinner.stop();
-      this.commitMessage = formatMessage(result, this.OPENAI_COMMIT_MESSAGE_REGEXP);
+      try {
+        this.commitMessage = buildCommitMessage(parseCommitMessage(result));
+      } catch (parseError) {
+        // 借鉴 langchain OutputFixingParser：解析失败自动让模型修复一次
+        const fixSpinner = new Spinner('输出不符合格式，正在自动修复...');
+        fixSpinner.start();
+        try {
+          const fixed = await this.aiService.fixCommitMessage(result, parseError.message);
+          this.commitMessage = buildCommitMessage(parseCommitMessage(fixed));
+          fixSpinner.success('已自动修复输出格式');
+        } catch (fixError) {
+          fixSpinner.stop();
+          throw fixError;
+        }
+      }
     } catch (error) {
       collectError(error);
       spinner.error('生成 commit message 失败');
@@ -211,7 +470,7 @@ class CommitAction extends BaseAction {
           error.response.data.error.code === 'context_length_exceeded'
         ) {
           Logger.error(
-            `更新内容超过模型支持的最大 token 数，请选择更小的文件集，使用 \`${BIN} set-max-token < maxToken >\` 设置最大 token 数。`
+            `更新内容超过模型支持的最大 token 数，请选择更小的文件集，或执行 \`${BIN} init\` 重新设置最大 token 数。`
           );
         } else {
           if (
@@ -244,13 +503,13 @@ class CommitAction extends BaseAction {
   /**
    * 判断是否需要通过 commit 去 merge
    */
-  commitMerge() {
+  async commitMerge() {
     if (!this.gitService.isMerging()) {
       return;
     }
 
     // 确保没有未解决的冲突
-    const statusOutput = this.gitService.getStatus();
+    const statusOutput = await this.gitService.getStatus();
     const hasUnresolved = statusOutput
       .split('\n')
       .some((line) => line.startsWith('UU') || line.startsWith('AA') || line.startsWith('DD'));
@@ -297,7 +556,7 @@ class CommitAction extends BaseAction {
         const errSpinner = new Spinner('AI 诊断 git commit 失败原因...');
         errSpinner.start();
         try {
-          const gitStatus = this.gitService.getStatus();
+          const gitStatus = await this.gitService.getStatus();
           const errorMessage = error && error.message ? error.message : error;
           const hookLogs = [error && error.stdout, error && error.stderr]
             .map((log) =>
@@ -347,10 +606,12 @@ class CommitAction extends BaseAction {
    * 获取远程仓库信息
    */
   async getRemoteInfo() {
-    Logger.info(`获取 git 远程仓库地址`);
     try {
-      this.remoteName = await this.gitService.getRemoteName(this.currentBranch);
-      Logger.success(`获取 git 远程仓库地址成功`);
+      this.remoteName = await this.runWithSpinner(
+        '正在获取远程仓库地址...',
+        () => this.gitService.getRemoteName(this.currentBranch),
+        '获取 git 远程仓库地址成功'
+      );
     } catch (error) {
       collectError(error);
       Logger.error(`获取 git 远程仓库地址失败，请检查 Git 是否正确配置`);
@@ -361,11 +622,13 @@ class CommitAction extends BaseAction {
   /**
    * Git fetch
    */
-  gitFetch() {
-    Logger.info(`获取远程仓库最新状态，执行 git fetch...`);
+  async gitFetch() {
     try {
-      this.gitService.fetch(this.remoteName);
-      Logger.success(`远程分支 ${this.remoteName} 的最新更改状态获取成功`);
+      await this.runWithSpinner(
+        '正在获取远程仓库最新状态，执行 git fetch...',
+        () => this.gitService.fetch(this.remoteName),
+        `远程分支 ${this.remoteName} 的最新更改状态获取成功`
+      );
     } catch (error) {
       collectWarning(error);
       Logger.error(`fetch 失败：${error && error.message ? error.message : error}`);
@@ -375,20 +638,24 @@ class CommitAction extends BaseAction {
   /**
    * Git merge
    */
-  gitMerge() {
-    Logger.info('正在检测是否需要合并...');
+  async gitMerge() {
+    // Logger.info('正在检测是否需要合并...');
     try {
       const aheadCount = this.gitService.getAheadCount(this.remoteName, this.currentBranch);
       if (aheadCount > 0) {
-        this.gitService.merge(this.remoteName, this.currentBranch);
-        Logger.success(`本地分支落后远程分支 \x1b[32m${aheadCount}次\x1b[0m，已合并最新代码`);
+        // git merge 为本地操作但大仓库可能较慢，用 spinner 包裹
+        await this.runWithSpinner(
+          `正在合并远程分支 ${this.remoteName}/${this.currentBranch} 的 ${aheadCount} 个提交...`,
+          () => this.gitService.merge(this.remoteName, this.currentBranch),
+          `本地分支落后远程分支 ${chalk.green(`${aheadCount}次`)}，已合并最新代码`
+        );
       } else {
         Logger.success('本地代码是最新，无需合并');
       }
     } catch (error) {
       collectWarning(error);
       Logger.warn(`合并失败：${error && error.message ? error.message : error}`);
-      this.commitMerge();
+      await this.commitMerge();
     }
   }
 
@@ -400,14 +667,12 @@ class CommitAction extends BaseAction {
     const originHasBranch = pushCount === -1;
 
     if (pushCount !== 0) {
-      Logger.info(
-        originHasBranch
-          ? `远程分支${this.currentBranch}不存在，推送新分支...`
-          : '正在推送本地分支与远程分支的差异...'
-      );
       try {
-        await this.gitService.push(this.remoteName, this.currentBranch);
-        Logger.success(
+        await this.runWithSpinner(
+          originHasBranch
+            ? `远程分支${this.currentBranch}不存在，正在推送新分支...`
+            : '正在推送本地分支与远程分支的差异...',
+          () => this.gitService.push(this.remoteName, this.currentBranch),
           originHasBranch ? '新分支已推送到远程仓库。' : '本地分支与远程分支的差异已推送。'
         );
       } catch (error) {
