@@ -37,13 +37,14 @@ import { collectError, collectWarning } from '../utils/Log.mjs';
  * 负责处理 git commit 的完整流程
  */
 class CommitAction extends BaseAction {
-  constructor({ allowEmpty, noVerify, noAdd, sign }) {
-    super({ allowEmpty, noVerify, noAdd, sign });
+  constructor({ allowEmpty, noVerify, noAdd, sign, noSign }) {
+    super({ allowEmpty, noVerify, noAdd, sign, noSign });
 
     this.allowEmpty = allowEmpty;
     this.noVerify = noVerify;
     this.noAdd = noAdd;
     this.sign = sign;
+    this.noSign = noSign;
     // 是否有冲突文件
     this.isConflit = false;
 
@@ -111,30 +112,47 @@ class CommitAction extends BaseAction {
    */
   prepare() {
     this.maxToken = parseInt(config.get('maxToken') || OPENAI_MAX_TOKEN_DEFAULT);
-    this.commitCommand = this.dryRun
-      ? 'git commit --dry-run -m'
-      : this.allowEmpty
-      ? 'git commit --allow-empty -m'
-      : this.noVerify
-      ? 'git commit --no-verify -m'
-      : 'git commit -m';
+    const flags = [];
+    if (this.dryRun) flags.push('--dry-run');
+    if (this.allowEmpty) flags.push('--allow-empty');
+    if (this.noVerify) flags.push('--no-verify');
+    this.commitCommand = `git commit ${flags.join(' ')} -m`;
   }
 
   /**
-   * 检查 GPG 签名：存在与 user.email 匹配的私钥则签名提交（git commit -S），否则警告后按普通方式提交
+   * 检查 GPG 签名：按全局 commit.gpgsign、脚手架 autoSign 配置、--sign/--noSign 指令决定提交是否签名
    */
   checkSign() {
-    if (!this.sign) return;
-    const email = this.gitService.getUserEmail();
-    if (email && this.gitService.hasGpgKeyForEmail(email)) {
-      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit -S');
+    // git config --global --get commit.gpgsign
+    const globalGpgsign = this.gitService.getGlobalCommitGpgsign();
+    // 脚手架 config（git ai gpg --auto-sign 写入本地存储）
+    const autoSign = config.get('autoSign');
+    // 脚手架签名指令
+    const sign = this.sign;
+    // 脚手架不签名指令
+    const noSign = this.noSign;
+    // gpg 签名列表
+    const gpglist = this.gitService.getGpgKeyList();
+
+    // 核心逻辑判断 和 log 提示
+    if (noSign && sign) {
+      throw '--sign --noSign 不能一起用';
+    }
+    // 不需要签名就不需要做额外处理
+    if (noSign) {
+      // 提交时带上 --no-gpg-sign（全局开启 commit.gpgsign 时跳过签名）
+      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit --no-gpg-sign');
       return;
     }
-    Logger.warn(
-      email
-        ? `未找到与 ${email} 匹配的 GPG 私钥，本次提交将不签名`
-        : '未配置 user.email，无法匹配 GPG 私钥，本次提交将不签名'
-    );
+    // 签名提交，但是没有一个签名就报错
+    if ((globalGpgsign || sign || autoSign) && !gpglist.length) {
+      throw '未找到 GPG 签名密钥，请使用 git ai gpg --create 生成签名';
+    }
+    // 说明必须签名
+    if (sign || autoSign) {
+      // 提交时带上 -S
+      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit -S');
+    }
   }
 
   /**
@@ -533,8 +551,14 @@ class CommitAction extends BaseAction {
    */
   async commit() {
     if (!this.diffString) {
-      Logger.warn(this.workingPrefix ? '当前目录下没有要提交的更改' : '没有要提交的更改');
+      if (!this.allowEmpty) {
+        Logger.warn(this.workingPrefix ? '当前目录下没有要提交的更改' : '没有要提交的更改');
+        return;
+      }
+      await this.commitEmpty();
       return;
+    } else if (this.allowEmpty) {
+      throw '暂存区有变更，--noVerify 仅用于空提交，请先执行 git stash 暂存变更，或去掉该参数后重试';
     }
     await this.generateMessage();
     const usageMessage = this.aiService.getUsageMessage();
@@ -586,6 +610,38 @@ class CommitAction extends BaseAction {
       throw aiDiagnosis
         ? `${baseMessage}，AI 诊断：\n${aiDiagnosis}${usageMessage ? '\n\n' : ''}${usageMessage}`
         : baseMessage;
+    }
+  }
+
+  /**
+   * 空提交（--allowEmpty 且暂存区无变更）：跳过 AI，由用户输入提交说明
+   */
+  async commitEmpty() {
+    Logger.warn(
+      this.workingPrefix
+        ? '当前目录下没有要提交的更改，将执行空提交（--allow-empty）'
+        : '没有要提交的更改，将执行空提交（--allow-empty）'
+    );
+    const { message } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'message',
+        message: '请输入提交说明：',
+        validate: (input) => (input && input.trim() ? true : '提交说明不能为空'),
+      },
+    ]);
+    this.commitMessage = message.trim();
+    const spinner = new Spinner('正在提交代码...');
+    spinner.start();
+    await spinner.sleep();
+    try {
+      await this.gitService.commit(`${this.commitCommand} "${this.commitMessage}"`, this.debug);
+      spinner.success('git commit 提交成功...');
+    } catch (error) {
+      spinner.stop();
+      collectError(error);
+      this.gitService.reset();
+      throw error && error.message ? error.message : error;
     }
   }
 

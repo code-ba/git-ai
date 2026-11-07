@@ -3,7 +3,8 @@ import CommitAction from './actions/CommitAction.mjs';
 import InitAction from './actions/InitAction.mjs';
 import GpgAction from './actions/GpgAction.mjs';
 import { exitProcess } from './utils/Utils.mjs';
-import { BIN, VERSION, DESCRIPTION, NAME, asciiArt } from './const.mjs';
+import { BIN, VERSION, DESCRIPTION, NAME, asciiArt, GPG_AUTO_COMMIT_SIGN } from './const.mjs';
+import { config } from './utils/Storage.mjs';
 import Logger from './utils/Logger.mjs';
 import chalk from 'chalk';
 
@@ -17,47 +18,27 @@ function registerCommand() {
       '-h',
       chalk.cyan(`显示帮助信息 （baseURL、model、token 分别支持多个，英文逗号隔开）`)
     );
-  program
-    .command('init')
-    .description(
-      `初始化配置（请求类型、baseURL、key、model、max-token），已配置的项会回显，回车保持当前值；model 从接口列表多选`
-    )
-    .action(InitAction);
+  program.command('init').description(`初始化大模型相关配置`).action(InitAction);
+  // 自动签名默认值：先从本地存储取，本地没数据再取 const.mjs 默认值
+  const autoSignDefault = config.get('autoSign') ?? GPG_AUTO_COMMIT_SIGN;
   program
     .command('gpg')
-    .description(
-      `GPG 密钥管理，如：${chalk.cyan('`' + BIN + ' gpg --create`')}
-   ${chalk.cyan(
-     '--create'
-   )}   创建密钥：输入邮箱（git config 已设置则回显）、选择 git 地址（可手动输入）、输入用户名/密码、选择加密方式，生成后导出公钥并设为默认签名密钥与 git config 邮箱
-   ${chalk.cyan(
-     '--list'
-   )}     查看密钥：展示密钥目录与密钥列表（序号 + 指纹 + UID + 算法/长度 + 创建日期）
-   ${chalk.cyan(
-     '--export'
-   )}   导出密钥：选择密钥后选择导出公钥或私钥（armor 格式），导出到密钥目录并展示
-   ${chalk.cyan('--delete')}   删除密钥：选择密钥后二次确认，删除公钥+私钥
-   ${chalk.cyan(
-     '--default'
-   )}  设默认签名密钥：依次选择 git 地址、邮箱、账号，从匹配的签名密钥列表中选择一个`
-    )
+    .description(`GPG 密钥管理，查看指令参数：${chalk.cyan('`' + BIN + ' gpg -h`')}`)
+    .option('--create', '创建 GPG 密钥并导出公钥、设为默认签名密钥')
+    .option('--list', '查看本机 GPG 密钥列表')
+    .option('--export', '选择密钥导出公钥或私钥')
+    .option('--delete', '选择密钥删除（公钥+私钥）')
+    .option('--default', '设置默认签名密钥')
+    .option('--local-default', '为当前项目指定签名密钥')
     .option(
-      '--create',
-      `创建 GPG 密钥：输入邮箱（git config 已设置则回显，回车保持当前值）、选择 git 地址（可手动输入）、明文输入用户名/密码、选择加密方式，生成后自动导出公钥到 ${chalk.cyan(
-        '`~/.config/git-ai/cli/gpg`'
-      )} 并展示，并设为默认签名密钥（git user.signingkey + gpg.conf default-key）与 git config 邮箱`
-    )
-    .option('--list', '查看本机 GPG 密钥（序号 + 指纹 + UID + 算法/长度 + 创建日期，不含子密钥）')
-    .option(
-      '--export',
-      `选择密钥导出：先选密钥，再选导出公钥或私钥（armor 格式），导出到 ${chalk.cyan(
-        '`~/.config/git-ai/cli/gpg`'
-      )} 并展示`
-    )
-    .option('--delete', '选择密钥删除：公钥+私钥一起删除，删除前二次确认')
-    .option(
-      '--default',
-      '设置默认签名密钥：依次选择 git 地址、邮箱、账号，从匹配的签名密钥列表中选择一个设为默认（git user.signingkey + gpg.conf default-key）'
+      '--auto-sign [boolean]',
+      `是否开启脚手架自动签名，等同于（${chalk.cyan(
+        '`git commit -S`'
+      )}）\n需要临时跳过签名执行${chalk.cyan('`git ai --noSign`')}）\n设置示例：${chalk.cyan(
+        '`' + BIN + ' gpg --auto-sign true`'
+      )}`,
+      (value) => (typeof value === 'boolean' ? value : String(value) === 'true'),
+      autoSignDefault
     )
     .action(GpgAction);
   program
@@ -69,11 +50,12 @@ function registerCommand() {
         '`' + BIN + ' --noAdd`'
       )}`
     )
+    .option('-s, --sign', `提交时对 commit 签名（等同于 ${chalk.cyan('`git commit -S`')}）`)
     .option(
-      '-s, --sign',
-      `提交时检查是否存在与 ${chalk.cyan(
-        '`user.email`'
-      )} 匹配的 GPG 私钥，有则签名提交（等同于 ${chalk.cyan('`git commit -S`')}），无则警告`
+      '--noSign',
+      `提交时 commit 跳过签名（等同于 ${chalk.cyan(
+        '`git commit --no-gpg-sign`'
+      )}）\n使用场景：全局开启自动签名${chalk.cyan('`git config --global --get commit.gpgsign`')}`
     )
     .description(
       `${DESCRIPTION}\n${asciiArt}\n使用 AI 自动生成提交信息并推送

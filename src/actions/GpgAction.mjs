@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import Logger from '../utils/Logger.mjs';
 import BaseAction from './BaseAction.mjs';
 import { GPG_EXPORT_DIR, GPG_GIT_HOSTS, GPG_ALGORITHMS } from '../const.mjs';
+import { config } from '../utils/Storage.mjs';
 
 // git 地址下拉选项中手动输入的标识值
 const CUSTOM_HOST = '__custom__';
@@ -100,15 +101,15 @@ const formatKeyLine = (key, index) =>
   )}  ${chalk.gray(formatDate(key.created))}`;
 
 /**
- * 从 UID 解析账号（name）、git 地址（括号内 comment）、邮箱（尖括号内 email）
- * 如 cxvh (github.com) <info@cxvh.com> → { username: 'cxvh', gitHost: 'github.com', email: 'info@cxvh.com' }
+ * 从 UID 解析 Real name （name）、git 地址（括号内 comment）、邮箱（尖括号内 email）
+ * 如 cxvh (github.com) <info@cxvh.com> → { realname: 'cxvh', gitHost: 'github.com', email: 'info@cxvh.com' }
  */
 const parseUid = (uid) => {
   const nameMatch = uid.match(/^(.*?)\s*(?:\(|<)/);
   const commentMatch = uid.match(/\((.*?)\)/);
   const emailMatch = uid.match(/<([^>]*)>/);
   return {
-    username: nameMatch && nameMatch[1].trim() ? nameMatch[1].trim() : '',
+    realname: nameMatch && nameMatch[1].trim() ? nameMatch[1].trim() : '',
     gitHost: commentMatch && commentMatch[1].trim() ? commentMatch[1].trim() : '',
     email: emailMatch && emailMatch[1].trim() ? emailMatch[1].trim() : '',
   };
@@ -129,6 +130,52 @@ class GpgAction extends BaseAction {
       }).trim();
     } catch (error) {
       return '';
+    }
+  }
+
+  /**
+   * 读取 git 全局签名密钥（git config --global user.signingkey，未设置时返回空字符串）
+   */
+  getGitSigningKey() {
+    try {
+      return execFileSync('git', ['config', '--global', 'user.signingkey'], {
+        encoding: 'utf8',
+      }).trim();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  /**
+   * 读取 git 本地签名密钥（git config --local user.signingkey，未设置时返回空字符串）
+   */
+  getGitLocalSigningKey() {
+    try {
+      return execFileSync('git', ['config', '--local', 'user.signingkey'], {
+        encoding: 'utf8',
+      }).trim();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  /**
+   * 从 git 全局配置提取 git 地址（credential.https://<host>.xxx 键中的 host，去重），
+   * 如 credential.https://gitee.com.provider=generic → gitee.com
+   */
+  getGitGlobalHosts() {
+    try {
+      const out = execFileSync('git', ['config', '--global', '-l'], {
+        encoding: 'utf8',
+      });
+      const hosts = [];
+      out.split(/\r?\n/).forEach((line) => {
+        const match = line.match(/^credential\.https:\/\/(.+)\.[^.=]+=/);
+        if (match) hosts.push(match[1]);
+      });
+      return [...new Set(hosts)];
+    } catch (error) {
+      return [];
     }
   }
 
@@ -164,7 +211,8 @@ class GpgAction extends BaseAction {
         type: 'input',
         name: 'passphrase',
         message: '请输入 GPG 密钥密码：',
-        transformer: (value) => (value ? value : chalk.gray('选填')),
+        transformer: (value) =>
+          value ? value : chalk.gray('选填，不建议设置，每次 commit 签名都要输入密码'),
       },
     ]);
     return answers.passphrase.trim();
@@ -205,6 +253,7 @@ class GpgAction extends BaseAction {
         type: 'input',
         name,
         message: `请输入${label}`,
+        transformer: (value) => (value ? value : chalk.gray('无实际作用，理解为备注')),
         validate: (input) => ((input || '').trim() ? true : `${label.trim()}不能为空`),
       },
     ]);
@@ -231,8 +280,11 @@ class GpgAction extends BaseAction {
   /**
    * 从密钥列表中选择一个密钥，返回主密钥指纹
    * 选项单行展示（指纹取前 8 位），避免多行选项在 inquirer list 滚动时渲染错位
+   * @param {Function} [markMatch] - 可选，命中时选项末尾追加标注，如 (key) => parseUid(key.uid).email === 'xxx'
+   * @param {string} [markText] - 标注文案，默认（默认）
+   * @param {string} [defaultFingerprint] - 可选，默认选中的密钥指纹（光标默认停在该项）
    */
-  async promptKey(keys, message) {
+  async promptKey(keys, message, markMatch, markText = '（默认）', defaultFingerprint) {
     const answers = await inquirer.prompt([
       {
         type: 'list',
@@ -244,8 +296,9 @@ class GpgAction extends BaseAction {
             key.uid
           }  ${chalk.green(formatAlgo(key.algo, key.keyLength))}  ${chalk.gray(
             formatDate(key.created)
-          )}`,
+          )}${markMatch && markMatch(key) ? markText : ''}`,
         })),
+        default: defaultFingerprint,
         loop: false,
       },
     ]);
@@ -282,8 +335,10 @@ class GpgAction extends BaseAction {
     const copied = this.copyToClipboard(content.trim());
     Logger.info(
       copied
-        ? `公钥已复制到剪贴板，直接粘贴到 git 仓库的 GPG 公钥设置`
-        : `复制以下公钥到 git 仓库的 GPG 公钥：\n${content.trim()}`
+        ? `公钥已复制到剪贴板，直接粘贴到 git 仓库的 GPG 公钥设置：\n${chalk.bgCyan(
+            content.trim()
+          )}`
+        : `复制以下公钥到 git 仓库的 GPG 公钥：\n${chalk.bgCyan(content.trim())}`
     );
     Logger.success(`已导出: ${filePath}`);
     return filePath;
@@ -321,7 +376,7 @@ class GpgAction extends BaseAction {
     const gitEmail = this.getGitEmail();
     const email = await this.promptEmail(gitEmail);
     const gitHost = await this.promptGitHost();
-    const username = await this.promptText('username', ' git 用户名');
+    const realname = await this.promptText('realname', '真实姓名(Real name)');
     const passphrase = await this.promptPassphrase();
     const algorithm = await this.promptAlgorithm();
 
@@ -330,23 +385,28 @@ class GpgAction extends BaseAction {
     const before = listGpgKeys()
       .filter((key) => key.uid.includes(email))
       .map((key) => key.fingerprint);
-    execFileSync(
-      'gpg',
-      [
-        '--quiet',
-        '--batch',
-        '--pinentry-mode',
-        'loopback',
-        '--passphrase',
-        passphrase,
-        '--quick-generate-key',
-        `${username} (${gitHost}) <${email}>`,
-        algorithm,
-        'default',
-        '0',
-      ],
-      { stdio: 'ignore' }
-    );
+    try {
+      execFileSync(
+        'gpg',
+        [
+          '--quiet',
+          '--batch',
+          '--pinentry-mode',
+          'loopback',
+          '--passphrase',
+          passphrase,
+          '--quick-generate-key',
+          `${realname} (${gitHost}) <${email}>`,
+          algorithm,
+          'default',
+          '0',
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+    } catch (error) {
+      // 生成失败时展示 gpg 的真实报错（stderr），便于定位
+      throw new Error(`GPG 密钥生成失败：${(error.stderr || error.message || '').trim()}`);
+    }
     const fingerprint = listGpgKeys()
       .filter((key) => key.uid.includes(email))
       .map((key) => key.fingerprint)
@@ -365,7 +425,7 @@ class GpgAction extends BaseAction {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    this.exportAndShow(publicKey, `${username}_${gitHost}_${algorithm}_${formatTimestamp()}.asc`);
+    this.exportAndShow(publicKey, `${realname}_${gitHost}_${algorithm}_${formatTimestamp()}.asc`);
     this.setDefaultKey(fingerprint);
   }
 
@@ -389,10 +449,9 @@ class GpgAction extends BaseAction {
       .replace(/\\/g, '/')}`;
     const displayHome = gpgHome.replace(msysHome, '~').replace(/\//g, '\\');
     const keyDir = `${displayHome}\\openpgp-revocs.d`;
+    Logger.info(`密钥所在目录: ${chalk.cyan(keyDir)}`);
     Logger.info(
-      `密钥目录: ${chalk.cyan(keyDir)}\n${keys
-        .map((key, index) => formatKeyLine(key, index))
-        .join('\n')}`
+      `所有密钥如下: \n${keys.map((key, index) => formatKeyLine(key, index)).join('\n')}`
     );
   }
 
@@ -415,7 +474,7 @@ class GpgAction extends BaseAction {
         name: 'keyType',
         message: '请选择导出内容',
         choices: [
-          { value: 'pub', name: '公钥' },
+          { value: 'pub', name: '公钥（默认）' },
           { value: 'secret', name: '私钥' },
         ],
         default: 'pub',
@@ -428,11 +487,11 @@ class GpgAction extends BaseAction {
       ['--quiet', '--armor', isSecret ? '--export-secret-keys' : '--export', fingerprint],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     );
-    const { username, gitHost } = parseUid(key.uid);
+    const { realname, gitHost } = parseUid(key.uid);
     const fallback = fingerprint.slice(0, 8);
     this.exportAndShow(
       content,
-      `${username || fallback}_${gitHost || fallback}_${formatAlgo(
+      `${realname || fallback}_${gitHost || fallback}_${formatAlgo(
         key.algo,
         key.keyLength
       )}_${formatTimestamp()}.asc`
@@ -487,8 +546,9 @@ class GpgAction extends BaseAction {
 
   /**
    * --default：设置默认签名密钥，逐步定位：
-   * 选择 git 地址（已有签名密钥 UID 中的 git 地址）→ 选择邮箱 → 选择账号 →
-   * 展示过滤后的签名密钥列表选择 → 设为默认（git user.signingkey + gpg.conf default-key）
+   * 选择 git 地址（已有签名密钥 UID 中的 git 地址）→ 选择邮箱 →
+   * 展示过滤后的签名密钥列表选择（git 地址在全局配置中且邮箱为全局 user.email 的密钥标注（默认））→
+   * 设为默认（git user.signingkey + gpg.conf default-key）
    */
   async executeDefault() {
     const secretKeys = listGpgKeys('sec');
@@ -497,6 +557,10 @@ class GpgAction extends BaseAction {
       return;
     }
     const uids = secretKeys.map((key) => parseUid(key.uid));
+
+    // 全局默认：git config --global 的 user.email + credential.https://<host>.* 中的 git 地址
+    const globalEmail = this.getGitEmail();
+    const globalHosts = this.getGitGlobalHosts();
 
     const gitHosts = [...new Set(uids.map((uid) => uid.gitHost).filter(Boolean))];
     if (!gitHosts.length) {
@@ -513,20 +577,51 @@ class GpgAction extends BaseAction {
     }
     const email = await this.promptFromList(emails, '请选择邮箱');
 
-    const matchedByEmail = matchedByHost.filter((uid) => uid.email === email);
-    const usernames = [...new Set(matchedByEmail.map((uid) => uid.username).filter(Boolean))];
-    if (!usernames.length) {
-      Logger.warn('未找到包含账号的签名密钥');
-      return;
-    }
-    const username = await this.promptFromList(usernames, '请选择账号');
-
     const matched = secretKeys.filter((key) => {
       const uid = parseUid(key.uid);
-      return uid.gitHost === gitHost && uid.email === email && uid.username === username;
+      return uid.gitHost === gitHost && uid.email === email;
     });
-    const fingerprint = await this.promptKey(matched, '请选择要设为默认的签名密钥');
+    const fingerprint = await this.promptKey(matched, '请选择要设为默认的签名密钥', (key) => {
+      const uid = parseUid(key.uid);
+      return globalHosts.includes(uid.gitHost) && uid.email === globalEmail;
+    });
     this.setDefaultKey(fingerprint);
+  }
+
+  /**
+   * --local-default：为当前项目指定签名密钥，拉出所有可签名密钥列表选择，
+   * git config --local user.signingkey <指纹>
+   * 本地已设置时列表标注（当前）并默认选中；本地密钥已被删除时提示后重新选择
+   */
+  async executeLocalDefault() {
+    const secretKeys = listGpgKeys('sec');
+    if (!secretKeys.length) {
+      Logger.warn('未找到可签名的 GPG 密钥（无私钥）');
+      return;
+    }
+    const localKey = this.getGitLocalSigningKey();
+    let markMatch;
+    let defaultFingerprint;
+    if (localKey) {
+      const current = secretKeys.find((key) => key.fingerprint.endsWith(localKey));
+      if (current) {
+        markMatch = (key) => key.fingerprint === current.fingerprint;
+        defaultFingerprint = current.fingerprint;
+      } else {
+        Logger.warn(`本地已设置的签名密钥不存在（可能已被删除）: ${localKey}，请重新选择`);
+      }
+    }
+    const fingerprint = await this.promptKey(
+      secretKeys,
+      '请选择要设为当前项目的签名密钥',
+      markMatch,
+      '（当前）',
+      defaultFingerprint
+    );
+    execFileSync('git', ['config', '--local', 'user.signingkey', fingerprint], {
+      stdio: 'ignore',
+    });
+    Logger.success(`已设为当前项目签名密钥（git config --local user.signingkey）: ${fingerprint}`);
   }
 
   async execute() {
@@ -535,11 +630,19 @@ class GpgAction extends BaseAction {
     else if (this.args.export) await this.executeExport();
     else if (this.args.delete) await this.executeDelete();
     else if (this.args.default) await this.executeDefault();
-    else Logger.warn('请使用 git-ai gpg --create / --list / --export / --delete / --default');
+    else if (this.args.localDefault) await this.executeLocalDefault();
+    else this.args.command.help();
   }
 }
 
-export default async function (options = {}) {
-  const action = new GpgAction(options);
-  await action.run();
+export default async function (options = {}, command = {}) {
+  const keys = Object.keys(options);
+  if (keys.length === 1) {
+    // autoSign 解析值写入本地存储，供下次默认值取用
+    config.set('autoSign', options.autoSign);
+    Logger.success(`自动检测签名：${options.autoSign ? '已开启' : '已关闭'}`);
+  } else {
+    const action = new GpgAction({ ...options, command });
+    await action.run();
+  }
 }

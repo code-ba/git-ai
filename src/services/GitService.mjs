@@ -185,6 +185,37 @@ export class GitService {
   }
 
   /**
+   * 读取全局签名开关（git config --global --get commit.gpgsign），未设置或非 true 时返回 false
+   */
+  getGlobalCommitGpgsign() {
+    try {
+      return (
+        this.exec('git config --global --get commit.gpgsign', {
+          stdio: ['pipe', 'pipe', 'ignore'],
+        })
+          .toString()
+          .trim() === 'true'
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 获取 gpg 签名密钥列表（所有私钥的 uid 行）；gpg 未安装时返回空列表
+   */
+  getGpgKeyList() {
+    try {
+      const output = this.exec('gpg --list-secret-keys --with-colons', {
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }).toString();
+      return output.split('\n').filter((line) => line.startsWith('uid:'));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
    * 获取差异字符串（异步，避免大仓库阻塞界面）
    * 采用"先探测规模、再按需拉取"策略：
    * 先用 --shortstat（输出恒定很小）估算规模，超过 token 预算则只返回 --stat 摘要，

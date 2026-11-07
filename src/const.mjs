@@ -186,6 +186,8 @@ export const GPG_GIT_HOSTS = [
   { value: 'gitea.com', name: 'gitea.com' },
   { value: '__custom__', name: '其他（手动输入）' },
 ];
+// 自动开启签名配置项（仅存储值，是否执行由调用方决定）
+export const GPG_AUTO_COMMIT_SIGN = false;
 // 加密方式下拉选项（gpg --quick-generate-key 的 algo 参数）
 export const GPG_ALGORITHMS = [
   { value: 'ed25519', name: 'ed25519（密钥更小、签名更快，默认）' },
