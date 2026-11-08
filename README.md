@@ -60,6 +60,7 @@ git ai
 | `git ai -s, --sign`       | GPG 签名提交          |
 | `git ai --noSign`         | 跳过 GPG 签名提交     |
 | `git ai gpg`              | GPG 密钥管理          |
+| `git ai clean`            | 清理被 .gitignore 忽略却已提交的文件 |
 | `git ai init`             | 交互式初始化/更新配置 |
 
 ## 🔑 GPG 签名管理
@@ -75,6 +76,19 @@ git ai gpg --auto-sign true # 开启脚手架自动签名（等同于 git commit
 ```
 
 临时跳过签名提交：`git ai --noSign`（等同于 `git commit --no-gpg-sign`）。
+
+## 🧹 清理被忽略却已提交的文件
+
+```bash
+git ai clean
+```
+
+扫描已跟踪但命中 `.gitignore` 规则的文件：
+
+- 按一级目录聚合展示命中文件及数量；没有命中时提示「未检测到 .gitignore 有问题的文件」并结束
+- 询问「是否修复（从 git 索引移除，本地文件保留）？」，默认 Yes；取消则不处理
+- 确认后分批执行 `git rm --cached`，从索引移除，本地文件保留
+- 完成提示「已清理 N 个文件，本地文件已保留」
 
 ## ⚙️ 配置说明
 
