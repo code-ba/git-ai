@@ -1,4 +1,4 @@
-import { execSync, exec as execCallback } from 'child_process';
+import { execSync, exec as execCallback, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import { collectGitExecLog } from '../utils/Log.mjs';
 import Logger from '../utils/Logger.mjs';
@@ -143,44 +143,17 @@ export class GitService {
   }
 
   /**
-   * 获取用户名
-   */
-  getUserName() {
-    return this.exec('git config user.name').toString().trim();
-  }
-
-  /**
-   * 获取用户邮箱，未配置时返回空字符串
+   * 获取 git 全局邮箱（git config --global user.email），未设置时返回空字符串
    */
   getUserEmail() {
     try {
-      return this.exec('git config user.email', {
+      return this.exec('git config --global user.email', {
         stdio: ['pipe', 'pipe', 'ignore'],
       })
         .toString()
         .trim();
     } catch (error) {
       return '';
-    }
-  }
-
-  /**
-   * 检查是否存在与邮箱匹配的 GPG 私钥（用于 git commit -S 签名）
-   * gpg 未安装或无匹配密钥时返回 false
-   */
-  hasGpgKeyForEmail(email) {
-    try {
-      const output = this.exec('gpg --list-secret-keys --with-colons', {
-        stdio: ['pipe', 'pipe', 'ignore'],
-      }).toString();
-      // --with-colons 输出中 uid 行形如：uid:f::::...::Name <email>::...
-      const target = email.toLowerCase();
-      return output
-        .split('\n')
-        .filter((line) => line.startsWith('uid:'))
-        .some((line) => line.toLowerCase().includes(target));
-    } catch (error) {
-      return false;
     }
   }
 
@@ -336,11 +309,13 @@ export class GitService {
 
   /**
    * 执行 commit
+   * 使用参数数组形式调用 git，不经 shell 解析，
+   * 避免提交消息中的引号、换行、$、` 等字符破坏命令（兼容 Windows cmd/PowerShell 与 macOS/Linux shell）
    */
-  async commit(commitMessage) {
+  async commit(commitArgs) {
     return new Promise((resolve, reject) => {
       try {
-        execSync(commitMessage, {
+        execFileSync('git', commitArgs, {
           encoding: 'utf8',
           stdio: ['pipe', 'pipe', 'pipe'],
         });
@@ -526,19 +501,5 @@ export class GitService {
     await this.execAsync(`git push -u ${remoteName} ${currentBranch}`, {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
-  }
-
-  /**
-   * 检查远程分支是否存在
-   */
-  remoteHasBranch(remoteName, currentBranch) {
-    try {
-      this.exec(`git rev-parse --verify --quiet ${remoteName}/${currentBranch}`, {
-        stdio: ['pipe', 'pipe', 'ignore'],
-      });
-      return true;
-    } catch {
-      return false;
-    }
   }
 }

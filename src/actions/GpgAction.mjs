@@ -6,6 +6,7 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import Logger from '../utils/Logger.mjs';
 import BaseAction from './BaseAction.mjs';
+import { GitService } from '../services/GitService.mjs';
 import { GPG_EXPORT_DIR, GPG_GIT_HOSTS, GPG_ALGORITHMS } from '../const.mjs';
 import { config } from '../utils/Storage.mjs';
 
@@ -41,9 +42,9 @@ const formatAlgo = (algo, keyLength) =>
   algo === 22 ? 'ed25519' : `${ALGO_NAMES[algo] || `algo${algo}`}${keyLength}`;
 
 /**
- * 解析 gpg --with-colons --with-keygrip 输出，返回主密钥列表（不含子密钥）
+ * 解析 gpg --with-colons --with-keygrip 输出，返回主密钥列表（不含子密钥条目，子密钥指纹收集在 subFprs）
  * @param {string} recordType - 'pub' 公钥列表（--list-keys）/ 'sec' 签名密钥列表（--list-secret-keys，仅有私钥的密钥）
- * 每项：{ fingerprint, keygrip, algo, keyLength, created, uid }
+ * 每项：{ fingerprint, keygrip, algo, keyLength, created, uid, subFprs }
  */
 const listGpgKeys = (recordType = 'pub') => {
   let out = '';
@@ -63,9 +64,12 @@ const listGpgKeys = (recordType = 'pub') => {
   }
   const keys = [];
   let current = null;
+  // 主密钥信息收集齐全（fpr/grp/uid），在记录边界收尾入列
+  const isComplete = (key) => key.fingerprint && key.keygrip && key.uid;
   out.split(/\r?\n/).forEach((line) => {
     const parts = line.split(':');
     if (parts[0] === recordType) {
+      if (current && isComplete(current)) keys.push(current);
       current = {
         fingerprint: '',
         keygrip: '',
@@ -73,22 +77,22 @@ const listGpgKeys = (recordType = 'pub') => {
         keyLength: parseInt(parts[2], 10),
         created: parseInt(parts[5], 10),
         uid: '',
+        subFprs: [],
       };
       return;
     }
     if (!current) return;
-    if (parts[0] === 'fpr' && !current.fingerprint) {
-      current.fingerprint = parts[9];
+    if (parts[0] === 'fpr') {
+      // 第一个 fpr 是主密钥指纹，后续 fpr 是子密钥（ssb）指纹
+      if (!current.fingerprint) current.fingerprint = parts[9];
+      else current.subFprs.push(parts[9]);
     } else if (parts[0] === 'grp' && !current.keygrip) {
       current.keygrip = parts[9];
     } else if (parts[0] === 'uid' && !current.uid) {
       current.uid = parts[9];
     }
-    if (current.fingerprint && current.keygrip && current.uid) {
-      keys.push(current);
-      current = null;
-    }
   });
+  if (current && isComplete(current)) keys.push(current);
   return keys;
 };
 
@@ -116,21 +120,28 @@ const parseUid = (uid) => {
 };
 
 /**
+ * 按 git user.signingkey 的值匹配可签名密钥，返回命中的主密钥：
+ * 支持主密钥/子密钥的指纹或 key ID（指纹后缀，大小写不敏感）、邮箱
+ */
+const findKeyBySigningKey = (keys, signingKey) => {
+  const lower = signingKey.toLowerCase();
+  return keys.find((key) => {
+    if (key.fingerprint.toLowerCase().endsWith(lower)) return true;
+    if (key.subFprs.some((fpr) => fpr.toLowerCase().endsWith(lower))) return true;
+    const email = parseUid(key.uid).email.toLowerCase();
+    return !!email && email === lower;
+  });
+};
+
+/**
  * gpg 命令：
- *  --create 生成密钥并导出公钥；--list 查看密钥；--export 选择导出；--delete 选择删除
+ *  --create 生成密钥并导出公钥；--list 查看密钥；--export 选择导出；--delete 选择删除；
+ *  --default 设置默认签名密钥；--local-default 为当前项目指定签名密钥
  */
 class GpgAction extends BaseAction {
-  /**
-   * 读取 git 全局邮箱（git config --global user.email，未设置时返回空字符串）
-   */
-  getGitEmail() {
-    try {
-      return execFileSync('git', ['config', '--global', 'user.email'], {
-        encoding: 'utf8',
-      }).trim();
-    } catch (error) {
-      return '';
-    }
+  constructor(args) {
+    super(args);
+    this.gitService = new GitService();
   }
 
   /**
@@ -326,20 +337,25 @@ class GpgAction extends BaseAction {
 
   /**
    * 导出 armor 内容到 ~/.config/git-ai/cli/gpg，展示内容并自动复制到剪贴板，展示完整路径
+   * @param {boolean} [isSecret=false] 是否私钥（影响提示文案，私钥不能引导粘贴到平台公钥设置）
    */
-  exportAndShow(content, fileName) {
+  exportAndShow(content, fileName, isSecret = false) {
     const exportDir = join(homedir(), GPG_EXPORT_DIR);
     mkdirSync(exportDir, { recursive: true });
     const filePath = join(exportDir, fileName);
     writeFileSync(filePath, content);
     const copied = this.copyToClipboard(content.trim());
-    Logger.info(
-      copied
-        ? `公钥已复制到剪贴板，直接粘贴到 git 仓库的 GPG 公钥设置：\n${chalk.bgCyan(
-            content.trim()
-          )}`
-        : `复制以下公钥到 git 仓库的 GPG 公钥：\n${chalk.bgCyan(content.trim())}`
-    );
+    let tip;
+    if (isSecret) {
+      tip = copied
+        ? '私钥已复制到剪贴板，请妥善保管，切勿粘贴到 git 仓库的 GPG 公钥设置'
+        : '请妥善保管以下私钥，切勿粘贴到 git 仓库的 GPG 公钥设置';
+    } else {
+      tip = copied
+        ? '公钥已复制到剪贴板，直接粘贴到 git 仓库的 GPG 公钥设置'
+        : '复制以下公钥到 git 仓库的 GPG 公钥';
+    }
+    Logger.info(`${tip}：\n${chalk.bgCyan(content.trim())}`);
     Logger.success(`已导出: ${filePath}`);
     return filePath;
   }
@@ -373,7 +389,7 @@ class GpgAction extends BaseAction {
    */
   async executeCreate() {
     // 邮箱放第一位：git config 已设置 user.email 则回显（回车保持当前值），否则输入
-    const gitEmail = this.getGitEmail();
+    const gitEmail = this.gitService.getUserEmail();
     const email = await this.promptEmail(gitEmail);
     const gitHost = await this.promptGitHost();
     const realname = await this.promptText('realname', '真实姓名(Real name)');
@@ -393,15 +409,16 @@ class GpgAction extends BaseAction {
           '--batch',
           '--pinentry-mode',
           'loopback',
-          '--passphrase',
-          passphrase,
+          // 密码经 stdin 传入（gpg 只读第一行），避免出现在进程命令行中被 ps/任务管理器读到
+          '--passphrase-fd',
+          '0',
           '--quick-generate-key',
           `${realname} (${gitHost}) <${email}>`,
           algorithm,
           'default',
           '0',
         ],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], input: `${passphrase}\n` }
       );
     } catch (error) {
       // 生成失败时展示 gpg 的真实报错（stderr），便于定位
@@ -494,7 +511,8 @@ class GpgAction extends BaseAction {
       `${realname || fallback}_${gitHost || fallback}_${formatAlgo(
         key.algo,
         key.keyLength
-      )}_${formatTimestamp()}.asc`
+      )}_${formatTimestamp()}.asc`,
+      isSecret
     );
   }
 
@@ -559,7 +577,7 @@ class GpgAction extends BaseAction {
     const uids = secretKeys.map((key) => parseUid(key.uid));
 
     // 全局默认：git config --global 的 user.email + credential.https://<host>.* 中的 git 地址
-    const globalEmail = this.getGitEmail();
+    const globalEmail = this.gitService.getUserEmail();
     const globalHosts = this.getGitGlobalHosts();
 
     const gitHosts = [...new Set(uids.map((uid) => uid.gitHost).filter(Boolean))];
@@ -591,9 +609,12 @@ class GpgAction extends BaseAction {
   /**
    * --local-default：为当前项目指定签名密钥，拉出所有可签名密钥列表选择，
    * git config --local user.signingkey <指纹>
-   * 本地已设置时列表标注（当前）并默认选中；本地密钥已被删除时提示后重新选择
+   * 本地已设置时（支持指纹/key ID/子密钥指纹/邮箱，大小写不敏感）列表标注（当前）并默认选中；
+   * 本地密钥已被删除时提示后重新选择
    */
   async executeLocalDefault() {
+    // git config --local 仅在 git 仓库内可用，提前检查避免走完交互后写入才报错
+    this.gitService.checkRepository();
     const secretKeys = listGpgKeys('sec');
     if (!secretKeys.length) {
       Logger.warn('未找到可签名的 GPG 密钥（无私钥）');
@@ -603,7 +624,7 @@ class GpgAction extends BaseAction {
     let markMatch;
     let defaultFingerprint;
     if (localKey) {
-      const current = secretKeys.find((key) => key.fingerprint.endsWith(localKey));
+      const current = findKeyBySigningKey(secretKeys, localKey);
       if (current) {
         markMatch = (key) => key.fingerprint === current.fingerprint;
         defaultFingerprint = current.fingerprint;

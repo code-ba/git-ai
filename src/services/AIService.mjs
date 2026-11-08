@@ -1,6 +1,5 @@
 import { chat } from '../utils/OpenAI.mjs';
 import { generateSystemMessage, formatCompletions } from '../utils/MessageUtils.mjs';
-import { config } from '../utils/Storage.mjs';
 import chalk from 'chalk';
 /**
  * AI 服务类
@@ -10,13 +9,6 @@ export class AIService {
   constructor() {
     this.usageMessage = '';
   }
-  // 检查是否配置 baseUrl model
-  checkConfig() {
-    const baseURL = config.get('baseURL');
-    const key = config.get('key');
-    return baseURL && key;
-  }
-
   /**
    * 生成提交消息
    */

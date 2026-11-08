@@ -16,4 +16,4 @@ pnpm-debug.log*
 .vscode/
 .idea/
 .claude/
-
+.codebuddy/

@@ -9,11 +9,8 @@ export const BIN = Object.keys(pkg.bin)[0].split('-').join(' ');
 export const NAME = pkg.name;
 export const DESCRIPTION = pkg.description;
 export const VERSION = pkg.version;
-export const AUTHOR = pkg.author;
-export const LOWEST_NODE_VERSION = pkg.engines.node;
 export const OPENAI_TIMEOUT = 60 * 1000 * 3;
 export const OPENAI_MAX_TOKEN_DEFAULT = 128000;
-export const OPENAI_MODEL_LIST_URL = process.env.OPENAI_MODEL_LIST_URL;
 /**
  * 常用三种 AI 请求类型（init 时选择，存储在配置 requestType）
  * - chat: OpenAI 兼容 /chat/completions（默认；旧版本用户未配置 requestType 时，请求端也兜底走 chat）

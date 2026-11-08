@@ -1,7 +1,10 @@
+import axios from 'axios';
+import chalk from 'chalk';
 import Logger from './Logger.mjs';
 import { config } from './Storage.mjs';
 
 import { writeLogFile } from './Log.mjs';
+import { VERSION } from '../const.mjs';
 /**
  * 退出进程
  */
@@ -15,48 +18,11 @@ export const exitProcess = (code = 0, startTimestamp) => {
       duration > 10000 ? '耗时' : '用时'
     }: ${durationText}，程序退出...`;
 
-    if (code === 0) {
-      Logger.verbose(message);
-    } else {
-      Logger.verbose(message);
-    }
+    Logger.verbose(message);
   }
   process.exit(code);
 };
-export const createDeviceId = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const length = 64;
-  let deviceId = '';
-  for (let i = 0; i < length; i++) {
-    deviceId += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return deviceId;
-};
-/**
- * 获取设备ID
- */
-export const getDeviceId = () => {
-  return config.get('deviceId') || createDeviceId();
-};
-
-/**
- * 格式化 token 显示（隐藏中间部分）
- * @param {string} token - 单个或多个 token（逗号分隔）
- * @returns {string} 格式化后的 token 字符串
- */
-export const formatToken = (token) => {
-  if (!token) return '';
-
-  return token
-    .split(',')
-    .map((t) => {
-      const len = t.length;
-      if (len < 12) return `${t.slice(0, len < 5 ? 1 : 3)}...`;
-      return `${t.slice(0, 5)}...${t.slice(-5)}`;
-    })
-    .join('、');
-};
-// 写个方法，传入 [string,string]，随机取1个
+// 从数组中随机取一项
 export const randomItem = (arr) => {
   return arr[Math.floor(Math.random() * arr.length)];
 };
@@ -65,7 +31,63 @@ export const getOpenAiConfig = (key) => {
   const arr = item ? item.split(',') : [];
   return randomItem(arr) || '';
 };
-export const getRandomItem = (str) => {
-  const arr = str ? str.split(',') : [];
-  return randomItem(arr) || '';
+const isVersionLessThan = (a, b) => {
+  const parse = (version) =>
+    String(version)
+      .split('.')
+      .map((num) => parseInt(num, 10) || 0);
+  const aParts = parse(a);
+  const bParts = parse(b);
+  const length = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < length; i += 1) {
+    const diff = (aParts[i] || 0) - (bParts[i] || 0);
+    if (diff !== 0) return diff < 0;
+  }
+  return false;
+};
+
+export const queryLatestVersion = async () => {
+  const urls = [
+    'https://registry.npmmirror.com/@git-ai/cli',
+    'https://registry.npmjs.org/@git-ai/cli',
+  ];
+  for (const url of urls) {
+    try {
+      const { data } = await axios.get(url, { timeout: 10 * 1000 });
+      const latestVersion = data['dist-tags'] && data['dist-tags'].latest;
+      if (latestVersion) return latestVersion;
+    } catch {
+      continue;
+    }
+  }
+  return '';
+};
+
+export const saveUpdateInfo = (latestVersion) => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  config.set('updateInfo', {
+    latestVersion,
+    checkDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    currentVersion: VERSION,
+    needUpdate: isVersionLessThan(VERSION, latestVersion),
+  });
+};
+
+export const checkUpdate = () => {
+  const updateInfo = config.get('updateInfo') || {};
+  if (updateInfo.needUpdate) {
+    Logger.warn(
+      `发现新版本 ${updateInfo.latestVersion}，请执行：\n    ${chalk.cyan(
+        'npm install -g @git-ai/cli'
+      )}`
+    );
+  }
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  if (updateInfo.checkDate === today) return;
+  queryLatestVersion().then((latestVersion) => {
+    if (latestVersion) saveUpdateInfo(latestVersion);
+  });
 };

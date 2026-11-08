@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import Logger from './Logger.mjs';
 
 /**
  * 查找冲突文件
@@ -31,6 +32,7 @@ export const findConflictFiles = (paths, workingPrefix = '') => {
       }
     } catch (error) {
       // 文件读取失败，可能是被忽略的文件
+      Logger.error(`检测冲突失败：${p}，${error && error.message ? error.message : error}`);
       ignoreFiles.push(p);
     }
   }

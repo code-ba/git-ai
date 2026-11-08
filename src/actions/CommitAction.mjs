@@ -59,7 +59,7 @@ class CommitAction extends BaseAction {
     this.workingPrefix = '';
     this.repoRoot = '';
     this.diffString = '';
-    this.commitCommand = '';
+    this.commitArgs = [];
     this.commitMessage = '';
     this.OPENAI_COMMIT_MESSAGE_REGEXP = '';
     this.currentBranch = '';
@@ -116,7 +116,7 @@ class CommitAction extends BaseAction {
     if (this.dryRun) flags.push('--dry-run');
     if (this.allowEmpty) flags.push('--allow-empty');
     if (this.noVerify) flags.push('--no-verify');
-    this.commitCommand = `git commit ${flags.join(' ')} -m`;
+    this.commitArgs = ['commit', ...flags, '-m'];
   }
 
   /**
@@ -141,7 +141,7 @@ class CommitAction extends BaseAction {
     // 不需要签名就不需要做额外处理
     if (noSign) {
       // 提交时带上 --no-gpg-sign（全局开启 commit.gpgsign 时跳过签名）
-      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit --no-gpg-sign');
+      this.commitArgs.splice(1, 0, '--no-gpg-sign');
       return;
     }
     // 签名提交，但是没有一个签名就报错
@@ -151,7 +151,7 @@ class CommitAction extends BaseAction {
     // 说明必须签名
     if (sign || autoSign) {
       // 提交时带上 -S
-      this.commitCommand = this.commitCommand.replace(/^git commit/, 'git commit -S');
+      this.commitArgs.splice(1, 0, '-S');
     }
   }
 
@@ -558,7 +558,7 @@ class CommitAction extends BaseAction {
       await this.commitEmpty();
       return;
     } else if (this.allowEmpty) {
-      throw '暂存区有变更，--noVerify 仅用于空提交，请先执行 git stash 暂存变更，或去掉该参数后重试';
+      throw '暂存区有变更，--allowEmpty 仅用于空提交，请先执行 git stash 暂存变更，或去掉该参数后重试';
     }
     await this.generateMessage();
     const usageMessage = this.aiService.getUsageMessage();
@@ -569,7 +569,7 @@ class CommitAction extends BaseAction {
     spinner.start();
     await spinner.sleep();
     try {
-      await this.gitService.commit(`${this.commitCommand} "${this.commitMessage}"`, this.debug);
+      await this.gitService.commit([...this.commitArgs, this.commitMessage]);
       spinner.success('git commit 提交成功...');
     } catch (error) {
       spinner.stop();
@@ -602,7 +602,7 @@ class CommitAction extends BaseAction {
           usageMessage = this.aiService.getUsageMessage();
         } catch (diagnosisError) {
           collectWarning(diagnosisError);
-          errSpinner.warn('AI 诊断 git commit 失败原因时出错');
+          errSpinner.error('AI 诊断 git commit 失败原因时出错');
         }
       }
       const baseMessage = 'git commit 提交失败';
@@ -635,7 +635,7 @@ class CommitAction extends BaseAction {
     spinner.start();
     await spinner.sleep();
     try {
-      await this.gitService.commit(`${this.commitCommand} "${this.commitMessage}"`, this.debug);
+      await this.gitService.commit([...this.commitArgs, this.commitMessage]);
       spinner.success('git commit 提交成功...');
     } catch (error) {
       spinner.stop();

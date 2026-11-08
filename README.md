@@ -12,6 +12,7 @@
 - 🤖 **AI 自动生成提交消息**
 - 🔄 **完整 Git 工作流** (add/commit/fetch/merge/push)
 - 🛡️ **冲突检测** (Git 冲突 + 代码冲突标记)
+- 🔑 **GPG 签名管理** (创建/导出/删除密钥、设置默认签名密钥、自动签名)
 - 🔍 **AI 诊断** (commit 失败时自动分析)
 - ⚙️ **灵活配置** (支持多 API/模型/密钥)
 - 🎯 **符合规范** (feat/fix/docs 等格式)
@@ -57,7 +58,23 @@ git ai
 | `git ai -n, --noVerify`   | 跳过 Git hooks        |
 | `git ai --noAdd`          | 跳过 git add          |
 | `git ai -s, --sign`       | GPG 签名提交          |
+| `git ai --noSign`         | 跳过 GPG 签名提交     |
+| `git ai gpg`              | GPG 密钥管理          |
 | `git ai init`             | 交互式初始化/更新配置 |
+
+## 🔑 GPG 签名管理
+
+```bash
+git ai gpg --create         # 交互式创建 GPG 密钥并导出公钥、设为默认签名密钥
+git ai gpg --list           # 查看本机 GPG 密钥列表
+git ai gpg --export         # 选择密钥导出公钥或私钥
+git ai gpg --delete         # 选择密钥删除（公钥+私钥）
+git ai gpg --default        # 设置默认签名密钥
+git ai gpg --local-default  # 为当前项目指定签名密钥
+git ai gpg --auto-sign true # 开启脚手架自动签名（等同于 git commit -S），false 关闭
+```
+
+临时跳过签名提交：`git ai --noSign`（等同于 `git commit --no-gpg-sign`）。
 
 ## ⚙️ 配置说明
 
@@ -97,26 +114,24 @@ key1,key2,key3
 
 ```sh
 $ git ai
-git-ai verb @git-ai/cli@1.0.0
+git-ai verb @git-ai/cli@2.0.3
 git-ai verb 按 Ctrl+C 退出...
 git-ai success AI 生成的内容：
 docs(readme): 更新文档和代码格式规范
 
-- 添加了 select-model 命令的环境变量配置说明
+- 添加了 GPG 签名管理的文档说明
 - 统一了代码中的引号使用为双引号
 - 修复了 package.json 中缺少的 access 字段
 - 规范化了代码缩进和格式
 git-ai info 本次模型消耗统计：总数 17050 tokens、输入 16977 tokens、输出 73 tokens
 git-ai success git commit 提交成功...
-git-ai info 获取 git 远程仓库地址
+git-ai info 正在获取远程仓库地址...
 git-ai success 获取 git 远程仓库地址成功
 git-ai info 获取远程仓库最新状态，执行 git fetch...
 git-ai success 远程分支 origin 的最新更改状态获取成功
-git-ai info 正在检测是否需要拉取...
 git-ai success 本地代码是最新，无需合并
 git-ai info 正在推送本地分支与远程分支的差异...
 git-ai success 本地分支与远程分支的差异已推送。
-git-ai verb 日志地址: C:\Users\用户名\.config\git-ai\cli\logs\2025-11\log-2025-11-22_10-56-59.txt
 git-ai verb 本次执行指令耗时: 14.481 秒，程序退出...
 ```
 

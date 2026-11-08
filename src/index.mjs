@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import CommitAction from './actions/CommitAction.mjs';
 import InitAction from './actions/InitAction.mjs';
 import GpgAction from './actions/GpgAction.mjs';
-import { exitProcess } from './utils/Utils.mjs';
+import { exitProcess, checkUpdate } from './utils/Utils.mjs';
 import { BIN, VERSION, DESCRIPTION, NAME, asciiArt, GPG_AUTO_COMMIT_SIGN } from './const.mjs';
 import { config } from './utils/Storage.mjs';
 import Logger from './utils/Logger.mjs';
@@ -20,7 +20,9 @@ function registerCommand() {
     );
   program.command('init').description(`初始化大模型相关配置`).action(InitAction);
   // 自动签名默认值：先从本地存储取，本地没数据再取 const.mjs 默认值
-  const autoSignDefault = config.get('autoSign') ?? GPG_AUTO_COMMIT_SIGN;
+  // 等价于 ?? ：仅未设置（null/undefined）时取默认值，false 是合法值不能被覆盖
+  const storedAutoSign = config.get('autoSign');
+  const autoSignDefault = storedAutoSign == null ? GPG_AUTO_COMMIT_SIGN : storedAutoSign;
   program
     .command('gpg')
     .description(`GPG 密钥管理，查看指令参数：${chalk.cyan('`' + BIN + ' gpg -h`')}`)
@@ -76,6 +78,7 @@ async function prepare() {
 }
 function checkPkgVersion() {
   Logger.verbose(`${NAME}@${VERSION}`);
+  checkUpdate();
 }
 export default async function core() {
   startTimestamp = Date.now();

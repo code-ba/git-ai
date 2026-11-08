@@ -201,7 +201,7 @@ const buildAuthHeaders = (requestType, key) => {
 };
 
 /**
- * AI 请求统一入口（沿用 chat 命名，调用方 AIService / SelectModelAction 无需改动）
+ * AI 请求统一入口（沿用 chat 命名，调用方 AIService 无需改动）
  * 按配置 requestType 分发到常用的三种请求类型：
  *  - chat（默认）：POST /chat/completions；用户未设置类型（旧版本用户）时走此分支，即旧的请求方式
  *  - responses：POST /responses
