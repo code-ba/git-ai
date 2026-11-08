@@ -146,7 +146,7 @@ class CommitAction extends BaseAction {
     }
     // 签名提交，但是没有一个签名就报错
     if ((globalGpgsign || sign || autoSign) && !gpglist.length) {
-      throw '未找到 GPG 签名密钥，请使用 git ai gpg --create 生成签名';
+      throw `未找到 GPG 签名密钥，请使用 ${BIN} gpg --create 生成签名`;
     }
     // 说明必须签名
     if (sign || autoSign) {

@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import CommitAction from './actions/CommitAction.mjs';
 import InitAction from './actions/InitAction.mjs';
 import GpgAction from './actions/GpgAction.mjs';
+import CleanAction from './actions/CleanAction.mjs';
 import { exitProcess, checkUpdate } from './utils/Utils.mjs';
 import { BIN, VERSION, DESCRIPTION, NAME, asciiArt, GPG_AUTO_COMMIT_SIGN } from './const.mjs';
 import { config } from './utils/Storage.mjs';
@@ -19,6 +20,10 @@ function registerCommand() {
       chalk.cyan(`显示帮助信息 （baseURL、model、token 分别支持多个，英文逗号隔开）`)
     );
   program.command('init').description(`初始化大模型相关配置`).action(InitAction);
+  program
+    .command('clean')
+    .description(`清理被 .gitignore 忽略却已提交的文件（本地文件保留）`)
+    .action(CleanAction);
   // 自动签名默认值：先从本地存储取，本地没数据再取 const.mjs 默认值
   // 等价于 ?? ：仅未设置（null/undefined）时取默认值，false 是合法值不能被覆盖
   const storedAutoSign = config.get('autoSign');
@@ -36,7 +41,7 @@ function registerCommand() {
       '--auto-sign [boolean]',
       `是否开启脚手架自动签名，等同于（${chalk.cyan(
         '`git commit -S`'
-      )}）\n需要临时跳过签名执行${chalk.cyan('`git ai --noSign`')}）\n设置示例：${chalk.cyan(
+      )}）\n需要临时跳过签名执行${chalk.cyan('`' + BIN + ' --noSign`')}）\n设置示例：${chalk.cyan(
         '`' + BIN + ' gpg --auto-sign true`'
       )}`,
       (value) => (typeof value === 'boolean' ? value : String(value) === 'true'),
