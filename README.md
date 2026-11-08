@@ -51,17 +51,17 @@ git ai
 
 ## 📖 常用命令
 
-| 命令                      | 说明                  |
-| ------------------------- | --------------------- |
-| `git ai`                  | 生成并提交            |
-| `git ai -e, --allowEmpty` | 允许空提交            |
-| `git ai -n, --noVerify`   | 跳过 Git hooks        |
-| `git ai --noAdd`          | 跳过 git add          |
-| `git ai -s, --sign`       | GPG 签名提交          |
-| `git ai --noSign`         | 跳过 GPG 签名提交     |
-| `git ai gpg`              | GPG 密钥管理          |
+| 命令                      | 说明                                 |
+| ------------------------- | ------------------------------------ |
+| `git ai`                  | 生成并提交                           |
+| `git ai -e, --allowEmpty` | 允许空提交                           |
+| `git ai -n, --noVerify`   | 跳过 Git hooks                       |
+| `git ai --noAdd`          | 跳过 git add                         |
+| `git ai -s, --sign`       | GPG 签名提交                         |
+| `git ai --noSign`         | 跳过 GPG 签名提交                    |
+| `git ai gpg`              | GPG 密钥管理                         |
 | `git ai clean`            | 清理被 .gitignore 忽略却已提交的文件 |
-| `git ai init`             | 交互式初始化/更新配置 |
+| `git ai init`             | 交互式初始化/更新配置                |
 
 ## 🔑 GPG 签名管理
 
