@@ -123,16 +123,12 @@ class CommitAction extends BaseAction {
    * 检查 GPG 签名：按全局 commit.gpgsign、脚手架 autoSign 配置、--sign/--noSign 指令决定提交是否签名
    */
   checkSign() {
-    // git config --global --get commit.gpgsign
-    const globalGpgsign = this.gitService.getGlobalCommitGpgsign();
     // 脚手架 config（git ai gpg --auto-sign 写入本地存储）
     const autoSign = config.get('autoSign');
     // 脚手架签名指令
     const sign = this.sign;
     // 脚手架不签名指令
     const noSign = this.noSign;
-    // gpg 签名列表
-    const gpglist = this.gitService.getGpgKeyList();
 
     // 核心逻辑判断 和 log 提示
     if (noSign && sign) {
@@ -143,10 +139,6 @@ class CommitAction extends BaseAction {
       // 提交时带上 --no-gpg-sign（全局开启 commit.gpgsign 时跳过签名）
       this.commitArgs.splice(1, 0, '--no-gpg-sign');
       return;
-    }
-    // 签名提交，但是没有一个签名就报错
-    if ((globalGpgsign || sign || autoSign) && !gpglist.length) {
-      throw `未找到 GPG 签名密钥，请使用 ${BIN} gpg --create 生成签名`;
     }
     // 说明必须签名
     if (sign || autoSign) {

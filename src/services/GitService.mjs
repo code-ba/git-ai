@@ -175,7 +175,7 @@ export class GitService {
   }
 
   /**
-   * 获取 gpg 签名密钥列表（所有私钥的 uid 行）；gpg 未安装时返回空列表
+   * 获取 gpg 签名密钥列表（所有私钥的 uid 行）；gpg 未安装时返回空列表，请求时间很长
    */
   getGpgKeyList() {
     try {

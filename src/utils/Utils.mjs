@@ -78,9 +78,7 @@ export const checkUpdate = () => {
   const updateInfo = config.get('updateInfo') || {};
   if (updateInfo.needUpdate) {
     Logger.warn(
-      `发现新版本 ${updateInfo.latestVersion}，请执行：\n    ${chalk.cyan(
-        'npm install -g @git-ai/cli'
-      )}`
+      `发现新版本 ${updateInfo.latestVersion}，请执行：${chalk.cyan('npm install -g @git-ai/cli')}`
     );
   }
   const now = new Date();
