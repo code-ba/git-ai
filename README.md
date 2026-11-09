@@ -2,8 +2,9 @@
 
 [![npm version](https://img.shields.io/npm/v/@git-ai/cli.svg?logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
 [![npm downloads](https://img.shields.io/npm/dm/@git-ai/cli.svg)](https://www.npmjs.com/package/@git-ai/cli)
+[![Node.js](https://img.shields.io/node/v/@git-ai/cli)](https://www.npmjs.com/package/@git-ai/cli)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/code-ba/git-ai/publish.yml?branch=main&logo=github)](https://github.com/code-ba/git-ai/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 基于 AI 的 Git 提交消息生成器，自动分析代码变更并生成规范的 commit message。
 
@@ -156,4 +157,4 @@ git-ai verb 本次执行指令耗时: 14.481 秒，程序退出...
 
 ## 📄 许可证
 
-MIT License
+Apache License 2.0
