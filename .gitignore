@@ -17,3 +17,6 @@ pnpm-debug.log*
 .idea/
 .claude/
 .codebuddy/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

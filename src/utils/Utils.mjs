@@ -70,16 +70,13 @@ export const saveUpdateInfo = (latestVersion) => {
     latestVersion,
     checkDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
     currentVersion: VERSION,
-    needUpdate: isVersionLessThan(VERSION, latestVersion),
   });
 };
 
 export const checkUpdate = () => {
   const updateInfo = config.get('updateInfo') || {};
-  if (updateInfo.needUpdate) {
-    Logger.warn(
-      `发现新版本 ${updateInfo.latestVersion}，请执行：${chalk.cyan('npm install -g @git-ai/cli')}`
-    );
+  if (isVersionLessThan(VERSION, updateInfo.latestVersion)) {
+    Logger.warn(`发现新版本，请执行更新指令：${chalk.cyan('npm install -g @git-ai/cli')}`);
   }
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');

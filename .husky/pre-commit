@@ -3,7 +3,7 @@
 
 echo "Auto bumping patch version..."
 npm run version:bump
-git add package.json package-lock.json
+git add package.json
 
 echo "Running lint-staged..."
 npx lint-staged
