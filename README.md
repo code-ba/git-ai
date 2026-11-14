@@ -129,25 +129,26 @@ key1,key2,key3
 
 ```sh
 $ git ai
-git-ai verb @git-ai/cli@2.0.3
-git-ai verb 按 Ctrl+C 退出...
+git-ai verb @git-ai/cli@2.0.6 
+git-ai success 工作区状态检测完成 
+git-ai success git add 执行完成 
+git-ai success 暂存区文件分析完成 
+git-ai success 大文件检测完成 
+git-ai success 代码差异获取完成 
+git-ai verb 按 Ctrl+C 退出... 
 git-ai success AI 生成的内容：
-docs(readme): 更新文档和代码格式规范
+style(theme): 将 body 文字颜色设为白色
 
-- 添加了 GPG 签名管理的文档说明
-- 统一了代码中的引号使用为双引号
-- 修复了 package.json 中缺少的 access 字段
-- 规范化了代码缩进和格式
-git-ai info 本次模型消耗统计：总数 17050 tokens、输入 16977 tokens、输出 73 tokens
-git-ai success git commit 提交成功...
-git-ai info 正在获取远程仓库地址...
-git-ai success 获取 git 远程仓库地址成功
-git-ai info 获取远程仓库最新状态，执行 git fetch...
-git-ai success 远程分支 origin 的最新更改状态获取成功
-git-ai success 本地代码是最新，无需合并
-git-ai info 正在推送本地分支与远程分支的差异...
-git-ai success 本地分支与远程分支的差异已推送。
-git-ai verb 本次执行指令耗时: 14.481 秒，程序退出...
+在全局样式中为 body 添加 color: #ffffff，确保浅色背景下的文字可读性。 
+git-ai info 本次模型消耗统计：总数 458 tokens、输入 425 tokens、输出 33 tokens 
+git-ai success git commit 提交成功... 
+git-ai info 获取 git 远程仓库地址 
+git-ai WARN 未找到当前分支 main 的 remote 配置 
+git-ai WARN 未找到当前分支 main 的 upstream 配置 
+git-ai ERR! 获取 git 远程仓库地址失败，请检查 Git 是否正确配置 
+git-ai ERR! 未找到任何远程仓库配置 
+git-ai verb 日志地址: C:\Users\info\.config\git-ai\cli\logs\2026-11\log-2026-11-14_11-09-33.txt 
+git-ai verb 本次执行指令用时: 4.800 秒，程序退出... 
 ```
 
 ## 📋 系统要求

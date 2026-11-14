@@ -654,12 +654,10 @@ class CommitAction extends BaseAction {
    * 获取远程仓库信息
    */
   async getRemoteInfo() {
+    Logger.info(`获取 git 远程仓库地址`);
     try {
-      this.remoteName = await this.runWithSpinner(
-        '正在获取远程仓库地址...',
-        () => this.gitService.getRemoteName(this.currentBranch),
-        '获取 git 远程仓库地址成功'
-      );
+      this.remoteName = await this.gitService.getRemoteName(this.currentBranch);
+      Logger.success(`获取 git 远程仓库地址成功`);
     } catch (error) {
       collectError(error);
       Logger.error(`获取 git 远程仓库地址失败，请检查 Git 是否正确配置`);

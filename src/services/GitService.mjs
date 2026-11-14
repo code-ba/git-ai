@@ -2,6 +2,7 @@ import { execSync, exec as execCallback, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import { collectGitExecLog } from '../utils/Log.mjs';
 import Logger from '../utils/Logger.mjs';
+import Spinner from '../utils/Spinner.mjs';
 import { EXEC_MAX_BUFFER_SIZE } from '../const.mjs';
 
 // 异步 exec：供耗时命令使用，避免阻塞事件循环导致 spinner 卡顿
@@ -365,58 +366,67 @@ export class GitService {
    * 获取远程仓库名称（异步；git remote show 为网络操作，不阻塞界面）
    */
   async getRemoteName(currentBranch) {
-    let remoteName = '';
-
-    // 优先从当前分支配置中读取 remote
+    const spinner = new Spinner('正在获取远程仓库地址...').start();
     try {
-      remoteName = (
-        await this.execAsync(`git config --get branch.${currentBranch}.remote`, {
-          stdio: ['pipe', 'pipe', 'ignore'],
-        })
-      ).trim();
-    } catch {
-      Logger.warn(`未找到当前分支 ${currentBranch} 的 remote 配置`);
-    }
+      let remoteName = '';
 
-    if (!remoteName) {
+      // 优先从当前分支配置中读取 remote
       try {
-        const upstream = (
-          await this.execAsync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
+        remoteName = (
+          await this.execAsync(`git config --get branch.${currentBranch}.remote`, {
             stdio: ['pipe', 'pipe', 'ignore'],
           })
         ).trim();
-        if (upstream && upstream.includes('/')) {
-          remoteName = upstream.split('/')[0];
-        }
       } catch {
-        Logger.warn(`未找到当前分支 ${currentBranch} 的 upstream 配置`);
+        spinner.stop();
+        Logger.warn(`未找到当前分支 ${currentBranch} 的 remote 配置`);
+        spinner.start();
       }
-    }
 
-    // 回退：选择已存在的 remote（优先 origin）
-    if (!remoteName) {
-      const remotesOutput = (
-        await this.execAsync('git remote', {
-          stdio: ['pipe', 'pipe', 'ignore'],
-        })
-      ).trim();
-      const remotes = remotesOutput ? remotesOutput.split('\n').filter(Boolean) : [];
-      if (remotes.includes('origin')) {
-        remoteName = 'origin';
-      } else if (remotes.length > 0) {
-        remoteName = remotes[0];
+      if (!remoteName) {
+        try {
+          const upstream = (
+            await this.execAsync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
+              stdio: ['pipe', 'pipe', 'ignore'],
+            })
+          ).trim();
+          if (upstream && upstream.includes('/')) {
+            remoteName = upstream.split('/')[0];
+          }
+        } catch {
+          spinner.stop();
+          Logger.warn(`未找到当前分支 ${currentBranch} 的 upstream 配置`);
+          spinner.start();
+        }
       }
-    }
 
-    if (!remoteName) {
-      throw '未找到任何远程仓库配置';
-    }
+      // 回退：选择已存在的 remote（优先 origin）
+      if (!remoteName) {
+        const remotesOutput = (
+          await this.execAsync('git remote', {
+            stdio: ['pipe', 'pipe', 'ignore'],
+          })
+        ).trim();
+        const remotes = remotesOutput ? remotesOutput.split('\n').filter(Boolean) : [];
+        if (remotes.includes('origin')) {
+          remoteName = 'origin';
+        } else if (remotes.length > 0) {
+          remoteName = remotes[0];
+        }
+      }
 
-    // 验证 remote 是否存在（网络操作）
-    await this.execAsync(`git remote show ${remoteName}`, {
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
-    return remoteName;
+      if (!remoteName) {
+        throw '未找到任何远程仓库配置';
+      }
+
+      // 验证 remote 是否存在（网络操作）
+      await this.execAsync(`git remote show ${remoteName}`, {
+        stdio: ['pipe', 'pipe', 'ignore'],
+      });
+      return remoteName;
+    } finally {
+      spinner.stop();
+    }
   }
 
   /**
