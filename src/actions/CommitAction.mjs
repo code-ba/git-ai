@@ -1,9 +1,8 @@
 import { isAxiosError } from 'axios';
 import { config } from '../utils/Storage.mjs';
+import { BIN } from '../constants/package.mjs';
+import { OPENAI_COMMIT_MESSAGE_TYPES, OPENAI_MAX_TOKEN_DEFAULT } from '../constants/ai.mjs';
 import {
-  BIN,
-  OPENAI_COMMIT_MESSAGE_TYPES,
-  OPENAI_MAX_TOKEN_DEFAULT,
   CHECK_GITIGNORE_ENABLE,
   CHECK_DEPENDENCIES_ENABLE,
   CHECK_LARGE_FILES_ENABLE,
@@ -12,7 +11,7 @@ import {
   LARGE_FILE_WARN_SIZE,
   LARGE_FILE_CONFIRM_SIZE,
   SKIP_LARGE_FILE_CONFIRM_KEY,
-} from '../const.mjs';
+} from '../constants/check.mjs';
 import {
   checkGitignoreExists,
   findDependencyFiles,
@@ -23,6 +22,7 @@ import {
 } from '../utils/CheckUtils.mjs';
 import { parseCommitMessage, buildCommitMessage } from '../utils/MessageUtils.mjs';
 import { findConflictFiles } from '../utils/ConflictUtils.mjs';
+import { classifyGitError } from '../utils/GitErrorUtils.mjs';
 import { GitService } from '../services/GitService.mjs';
 import { AIService } from '../services/AIService.mjs';
 import Logger from '../utils/Logger.mjs';
@@ -376,7 +376,7 @@ class CommitAction extends BaseAction {
 
   /**
    * 检测大文件：超过 LARGE_FILE_WARN_SIZE 告警提示，超过 LARGE_FILE_CONFIRM_SIZE 需用户确认
-   * 用户确认一次后，以后都跳过超过 LARGE_FILE_CONFIRM_SIZE 的大文件检测（阈值见 const.mjs）
+   * 用户确认一次后，以后都跳过超过 LARGE_FILE_CONFIRM_SIZE 的大文件检测（阈值见 constants/check.mjs）
    */
   async checkLargeFiles(stagedFiles) {
     const { warnFiles, confirmFiles } = await this.runWithSpinner(
@@ -677,7 +677,8 @@ class CommitAction extends BaseAction {
       );
     } catch (error) {
       collectWarning(error);
-      Logger.error(`fetch 失败：${error && error.message ? error.message : error}`);
+      Logger.error(`fetch 失败：${classifyGitError(error)}`);
+      throw error && error.message ? error.message : error;
     }
   }
 
@@ -687,6 +688,11 @@ class CommitAction extends BaseAction {
   async gitMerge() {
     // Logger.info('正在检测是否需要合并...');
     try {
+      if (!this.gitService.hasRemoteBranch(this.remoteName, this.currentBranch)) {
+        Logger.info(`远程分支${this.currentBranch}不存在，跳过合并`);
+        return;
+      }
+
       const aheadCount = this.gitService.getAheadCount(this.remoteName, this.currentBranch);
       if (aheadCount > 0) {
         // git merge 为本地操作但大仓库可能较慢，用 spinner 包裹

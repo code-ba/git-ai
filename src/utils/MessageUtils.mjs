@@ -1,4 +1,4 @@
-import { BREAKING_CHANGE_MARKERS, OPENAI_COMMIT_MESSAGE_TYPES } from '../const.mjs';
+import { BREAKING_CHANGE_MARKERS, OPENAI_COMMIT_MESSAGE_TYPES } from '../constants/ai.mjs';
 import { getOSLanguage } from './LanguageUtils.mjs';
 
 /**

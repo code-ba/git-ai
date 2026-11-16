@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import Logger from '../utils/Logger.mjs';
 import BaseAction from './BaseAction.mjs';
 import { GitService } from '../services/GitService.mjs';
-import { GPG_EXPORT_DIR, GPG_GIT_HOSTS, GPG_ALGORITHMS } from '../const.mjs';
+import { GPG_EXPORT_DIR, GPG_GIT_HOSTS, GPG_ALGORITHMS } from '../constants/gpg.mjs';
 import { config } from '../utils/Storage.mjs';
 
 // git 地址下拉选项中手动输入的标识值
@@ -657,8 +657,8 @@ class GpgAction extends BaseAction {
 }
 
 export default async function (options = {}, command = {}) {
-  const keys = Object.keys(options);
-  if (keys.length === 1) {
+  const keys = process.argv.slice(2);
+  if (keys.includes('--auto-sign')) {
     // autoSign 解析值写入本地存储，供下次默认值取用
     config.set('autoSign', options.autoSign);
     Logger.success(`自动检测签名：${options.autoSign ? '已开启' : '已关闭'}`);

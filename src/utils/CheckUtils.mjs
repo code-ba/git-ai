@@ -9,7 +9,7 @@ import {
   ARCHIVE_FILE_PATTERNS,
   LARGE_FILE_WARN_SIZE,
   LARGE_FILE_CONFIRM_SIZE,
-} from '../const.mjs';
+} from '../constants/check.mjs';
 
 /**
  * 格式化文件大小

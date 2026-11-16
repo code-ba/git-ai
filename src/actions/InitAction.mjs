@@ -1,5 +1,5 @@
 import { config } from '../utils/Storage.mjs';
-import { OPENAI_MAX_TOKEN_DEFAULT, AI_REQUEST_TYPES } from '../const.mjs';
+import { OPENAI_MAX_TOKEN_DEFAULT, AI_REQUEST_TYPES } from '../constants/ai.mjs';
 import { getModelList } from '../utils/OpenAI.mjs';
 import inquirer from 'inquirer';
 import Logger from '../utils/Logger.mjs';

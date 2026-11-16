@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from './Storage.mjs';
-import { OPENAI_TIMEOUT } from '../const.mjs';
+import { OPENAI_TIMEOUT } from '../constants/ai.mjs';
 import { getOpenAiConfig } from './Utils.mjs';
 
 export const headers = {

@@ -1,5 +1,5 @@
 import npmlog from 'npmlog';
-import { BIN } from '../const.mjs';
+import { BIN } from '../constants/package.mjs';
 import { collectLoggerLog } from './Log.mjs';
 
 npmlog.level = 'info';

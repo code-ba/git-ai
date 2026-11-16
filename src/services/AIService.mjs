@@ -1,7 +1,7 @@
 import { chat } from '../utils/OpenAI.mjs';
 import { generateSystemMessage, formatCompletions } from '../utils/MessageUtils.mjs';
 import chalk from 'chalk';
-import { BIN } from '../const.mjs';
+import { BIN } from '../constants/package.mjs';
 /**
  * AI 服务类
  * 封装所有 AI 相关操作

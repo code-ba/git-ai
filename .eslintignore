@@ -8,3 +8,15 @@ temp/
 .vscode/
 .idea/
 .claude/
+.DS_Store
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+.codebuddy/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

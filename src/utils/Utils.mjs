@@ -4,7 +4,7 @@ import Logger from './Logger.mjs';
 import { config } from './Storage.mjs';
 
 import { writeLogFile } from './Log.mjs';
-import { VERSION } from '../const.mjs';
+import { VERSION } from '../constants/package.mjs';
 /**
  * 退出进程
  */

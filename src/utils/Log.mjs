@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { NAME } from '../const.mjs';
+import { NAME } from '../constants/package.mjs';
 import npmlog from 'npmlog';
 
 // 日志收集器

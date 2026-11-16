@@ -1,10 +1,10 @@
 # @git-ai/cli
 
-[![npm version](https://img.shields.io/npm/v/@git-ai/cli.svg?logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
-[![npm downloads](https://img.shields.io/npm/dm/@git-ai/cli.svg)](https://www.npmjs.com/package/@git-ai/cli)
-[![Node.js](https://img.shields.io/node/v/@git-ai/cli)](https://www.npmjs.com/package/@git-ai/cli)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/code-ba/git-ai/publish.yml?branch=main&logo=github)](https://github.com/code-ba/git-ai/actions)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![npm version](https://img.shields.io/npm/v/@git-ai/cli.svg?style=flat&logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
+[![npm downloads](https://img.shields.io/npm/dm/@git-ai/cli.svg?style=flat&logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
+[![Node.js](https://img.shields.io/node/v/@git-ai/cli?style=flat&logo=nodedotjs)](https://www.npmjs.com/package/@git-ai/cli)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/code-ba/git-ai/publish.yml?style=flat&branch=main&logo=github)](https://github.com/code-ba/git-ai/actions)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat&logo=opensourceinitiative)](https://opensource.org/licenses/Apache-2.0)
 
 基于 AI 的 Git 提交消息生成器，自动分析代码变更并生成规范的 commit message。
 
@@ -55,6 +55,7 @@ git ai
 | 命令                      | 说明                                 |
 | ------------------------- | ------------------------------------ |
 | `git ai`                  | 生成并提交                           |
+| `git ai -h`               | 显示帮助信息                         |
 | `git ai -e, --allowEmpty` | 允许空提交                           |
 | `git ai -n, --noVerify`   | 跳过 Git hooks                       |
 | `git ai --noAdd`          | 跳过 git add                         |
@@ -129,26 +130,26 @@ key1,key2,key3
 
 ```sh
 $ git ai
-git-ai verb @git-ai/cli@2.0.6 
-git-ai success 工作区状态检测完成 
-git-ai success git add 执行完成 
-git-ai success 暂存区文件分析完成 
-git-ai success 大文件检测完成 
-git-ai success 代码差异获取完成 
-git-ai verb 按 Ctrl+C 退出... 
+git-ai verb @git-ai/cli@2.0.6
+git-ai success 工作区状态检测完成
+git-ai success git add 执行完成
+git-ai success 暂存区文件分析完成
+git-ai success 大文件检测完成
+git-ai success 代码差异获取完成
+git-ai verb 按 Ctrl+C 退出...
 git-ai success AI 生成的内容：
 style(theme): 将 body 文字颜色设为白色
 
-在全局样式中为 body 添加 color: #ffffff，确保浅色背景下的文字可读性。 
-git-ai info 本次模型消耗统计：总数 458 tokens、输入 425 tokens、输出 33 tokens 
-git-ai success git commit 提交成功... 
-git-ai info 获取 git 远程仓库地址 
-git-ai WARN 未找到当前分支 main 的 remote 配置 
-git-ai WARN 未找到当前分支 main 的 upstream 配置 
-git-ai ERR! 获取 git 远程仓库地址失败，请检查 Git 是否正确配置 
-git-ai ERR! 未找到任何远程仓库配置 
-git-ai verb 日志地址: C:\Users\info\.config\git-ai\cli\logs\2026-11\log-2026-11-14_11-09-33.txt 
-git-ai verb 本次执行指令用时: 4.800 秒，程序退出... 
+在全局样式中为 body 添加 color: #ffffff，确保浅色背景下的文字可读性。
+git-ai info 本次模型消耗统计：总数 458 tokens、输入 425 tokens、输出 33 tokens
+git-ai success git commit 提交成功...
+git-ai info 获取 git 远程仓库地址
+git-ai WARN 未找到当前分支 main 的 remote 配置
+git-ai WARN 未找到当前分支 main 的 upstream 配置
+git-ai ERR! 获取 git 远程仓库地址失败，请检查 Git 是否正确配置
+git-ai ERR! 未找到任何远程仓库配置
+git-ai verb 日志地址: C:\Users\info\.config\git-ai\cli\logs\2026-11\log-2026-11-14_11-09-33.txt
+git-ai verb 本次执行指令用时: 4.800 秒，程序退出...
 ```
 
 ## 📋 系统要求

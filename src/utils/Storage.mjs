@@ -1,5 +1,5 @@
 import Configstore from 'configstore';
-import { NAME } from '../const.mjs';
+import { NAME } from '../constants/package.mjs';
 export const config = new Configstore(NAME, {
   style: 'long',
   description: 'bullet',

@@ -4,7 +4,9 @@ import InitAction from './actions/InitAction.mjs';
 import GpgAction from './actions/GpgAction.mjs';
 import CleanAction from './actions/CleanAction.mjs';
 import { exitProcess, checkUpdate } from './utils/Utils.mjs';
-import { BIN, VERSION, DESCRIPTION, NAME, asciiArt, GPG_AUTO_COMMIT_SIGN } from './const.mjs';
+import { BIN, VERSION, DESCRIPTION, NAME } from './constants/package.mjs';
+import { asciiArt } from './constants/banner.mjs';
+import { GPG_AUTO_COMMIT_SIGN } from './constants/gpg.mjs';
 import { config } from './utils/Storage.mjs';
 import Logger from './utils/Logger.mjs';
 import chalk from 'chalk';
@@ -24,7 +26,7 @@ function registerCommand() {
     .command('clean')
     .description(`清理被 .gitignore 忽略却已提交的文件（本地文件保留）`)
     .action(CleanAction);
-  // 自动签名默认值：先从本地存储取，本地没数据再取 const.mjs 默认值
+  // 自动签名默认值：先从本地存储取，本地没数据再取 constants/gpg.mjs 默认值
   // 等价于 ?? ：仅未设置（null/undefined）时取默认值，false 是合法值不能被覆盖
   const storedAutoSign = config.get('autoSign');
   const autoSignDefault = storedAutoSign == null ? GPG_AUTO_COMMIT_SIGN : storedAutoSign;

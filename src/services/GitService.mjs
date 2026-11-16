@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import { collectGitExecLog } from '../utils/Log.mjs';
 import Logger from '../utils/Logger.mjs';
 import Spinner from '../utils/Spinner.mjs';
-import { EXEC_MAX_BUFFER_SIZE } from '../const.mjs';
+import { EXEC_MAX_BUFFER_SIZE } from '../constants/check.mjs';
 
 // 异步 exec：供耗时命令使用，避免阻塞事件循环导致 spinner 卡顿
 const execPromise = promisify(execCallback);
@@ -371,32 +371,20 @@ export class GitService {
       let remoteName = '';
 
       // 优先从当前分支配置中读取 remote
-      try {
-        remoteName = (
-          await this.execAsync(`git config --get branch.${currentBranch}.remote`, {
-            stdio: ['pipe', 'pipe', 'ignore'],
-          })
-        ).trim();
-      } catch {
-        spinner.stop();
-        Logger.warn(`未找到当前分支 ${currentBranch} 的 remote 配置`);
-        spinner.start();
-      }
+      remoteName = (
+        await this.execAsync(`git config --get branch.${currentBranch}.remote`, {
+          stdio: ['pipe', 'pipe', 'ignore'],
+        }).catch(() => '')
+      ).trim();
 
       if (!remoteName) {
-        try {
-          const upstream = (
-            await this.execAsync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
-              stdio: ['pipe', 'pipe', 'ignore'],
-            })
-          ).trim();
-          if (upstream && upstream.includes('/')) {
-            remoteName = upstream.split('/')[0];
-          }
-        } catch {
-          spinner.stop();
-          Logger.warn(`未找到当前分支 ${currentBranch} 的 upstream 配置`);
-          spinner.start();
+        const upstream = (
+          await this.execAsync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
+            stdio: ['pipe', 'pipe', 'ignore'],
+          }).catch(() => '')
+        ).trim();
+        if (upstream && upstream.includes('/')) {
+          remoteName = upstream.split('/')[0];
         }
       }
 
@@ -418,11 +406,6 @@ export class GitService {
       if (!remoteName) {
         throw '未找到任何远程仓库配置';
       }
-
-      // 验证 remote 是否存在（网络操作）
-      await this.execAsync(`git remote show ${remoteName}`, {
-        stdio: ['pipe', 'pipe', 'ignore'],
-      });
       return remoteName;
     } finally {
       spinner.stop();
@@ -468,6 +451,20 @@ export class GitService {
     await this.execAsync(`git merge ${remoteName}/${currentBranch}`, {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
+  }
+
+  /**
+   * 判断远程分支是否存在
+   */
+  hasRemoteBranch(remoteName, currentBranch) {
+    try {
+      this.exec(`git rev-parse --verify --quiet ${remoteName}/${currentBranch}`, {
+        stdio: ['pipe', 'pipe', 'ignore'],
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
