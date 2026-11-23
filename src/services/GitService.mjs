@@ -363,6 +363,16 @@ export class GitService {
   }
 
   /**
+   * 获取指定远程仓库的地址
+   */
+  getRemoteUrl(remoteName) {
+    return execFileSync('git', ['remote', 'get-url', remoteName], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim();
+  }
+
+  /**
    * 获取远程仓库名称（异步；git remote show 为网络操作，不阻塞界面）
    */
   async getRemoteName(currentBranch) {

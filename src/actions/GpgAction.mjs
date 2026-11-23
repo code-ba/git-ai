@@ -1,4 +1,5 @@
-import { execFileSync } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
+import { promisify } from 'util';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -9,6 +10,8 @@ import BaseAction from './BaseAction.mjs';
 import { GitService } from '../services/GitService.mjs';
 import { GPG_EXPORT_DIR, GPG_GIT_HOSTS, GPG_ALGORITHMS } from '../constants/gpg.mjs';
 import { config } from '../utils/Storage.mjs';
+
+const execFileAsync = promisify(execFile);
 
 // git 地址下拉选项中手动输入的标识值
 const CUSTOM_HOST = '__custom__';
@@ -41,27 +44,19 @@ const formatDate = (seconds) => {
 const formatAlgo = (algo, keyLength) =>
   algo === 22 ? 'ed25519' : `${ALGO_NAMES[algo] || `algo${algo}`}${keyLength}`;
 
+const getGpgListArgs = (recordType) => [
+  '--quiet',
+  '--with-colons',
+  '--with-keygrip',
+  recordType === 'sec' ? '--list-secret-keys' : '--list-keys',
+];
+
 /**
  * 解析 gpg --with-colons --with-keygrip 输出，返回主密钥列表（不含子密钥条目，子密钥指纹收集在 subFprs）
  * @param {string} recordType - 'pub' 公钥列表（--list-keys）/ 'sec' 签名密钥列表（--list-secret-keys，仅有私钥的密钥）
  * 每项：{ fingerprint, keygrip, algo, keyLength, created, uid, subFprs }
  */
-const listGpgKeys = (recordType = 'pub') => {
-  let out = '';
-  try {
-    out = execFileSync(
-      'gpg',
-      [
-        '--quiet',
-        '--with-colons',
-        '--with-keygrip',
-        recordType === 'sec' ? '--list-secret-keys' : '--list-keys',
-      ],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
-    );
-  } catch (error) {
-    return [];
-  }
+const parseGpgKeys = (out, recordType) => {
   const keys = [];
   let current = null;
   // 主密钥信息收集齐全（fpr/grp/uid），在记录边界收尾入列
@@ -96,6 +91,33 @@ const listGpgKeys = (recordType = 'pub') => {
   return keys;
 };
 
+const listGpgKeys = (recordType = 'pub') => {
+  let out = '';
+  try {
+    out = execFileSync('gpg', getGpgListArgs(recordType), {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch (error) {
+    return [];
+  }
+  return parseGpgKeys(out, recordType);
+};
+
+/**
+ * 异步读取密钥列表，供带 Spinner 的自动签名流程使用
+ */
+export const listGpgKeysAsync = async (recordType = 'pub') => {
+  try {
+    const { stdout } = await execFileAsync('gpg', getGpgListArgs(recordType), {
+      encoding: 'utf8',
+    });
+    return parseGpgKeys(stdout, recordType);
+  } catch (error) {
+    return [];
+  }
+};
+
 /**
  * 密钥列表行（带颜色和缩进）：缩进 序号(黄) 指纹(青) UID 算法(绿) 创建日期(灰)
  */
@@ -108,7 +130,7 @@ const formatKeyLine = (key, index) =>
  * 从 UID 解析 Real name （name）、git 地址（括号内 comment）、邮箱（尖括号内 email）
  * 如 cxvh (github.com) <info@cxvh.com> → { realname: 'cxvh', gitHost: 'github.com', email: 'info@cxvh.com' }
  */
-const parseUid = (uid) => {
+export const parseUid = (uid) => {
   const nameMatch = uid.match(/^(.*?)\s*(?:\(|<)/);
   const commentMatch = uid.match(/\((.*?)\)/);
   const emailMatch = uid.match(/<([^>]*)>/);
@@ -136,7 +158,7 @@ const findKeyBySigningKey = (keys, signingKey) => {
 /**
  * gpg 命令：
  *  --create 生成密钥并导出公钥；--list 查看密钥；--export 选择导出；--delete 选择删除；
- *  --default 设置默认签名密钥；--local-default 为当前项目指定签名密钥
+ *  --default 设置默认签名密钥；--local-default 为当前项目指定签名密钥；--auto-sign 开启或关闭自动签名
  */
 class GpgAction extends BaseAction {
   constructor(args) {

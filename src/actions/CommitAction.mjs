@@ -25,12 +25,18 @@ import { findConflictFiles } from '../utils/ConflictUtils.mjs';
 import { classifyGitError } from '../utils/GitErrorUtils.mjs';
 import { GitService } from '../services/GitService.mjs';
 import { AIService } from '../services/AIService.mjs';
+import { listGpgKeysAsync, parseUid } from './GpgAction.mjs';
 import Logger from '../utils/Logger.mjs';
 import Spinner from '../utils/Spinner.mjs';
 import BaseAction from './BaseAction.mjs';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { collectError, collectWarning } from '../utils/Log.mjs';
+
+const getRemoteHost = (remoteUrl) => {
+  const match = remoteUrl.match(/^(?:[a-z][a-z\d+.-]*:\/\/)?(?:[^@/\s]+@)?([^:/\s]+)/i);
+  return match ? match[1].toLowerCase() : '';
+};
 
 /**
  * Commit Action 类
@@ -73,7 +79,7 @@ class CommitAction extends BaseAction {
     this.prepare();
     this.gitService.checkInstalled();
     this.gitService.checkRepository();
-    this.checkSign();
+    await this.checkSign();
     this.checkWorkingPrefix();
     await this.checkGitConflict();
     await this.addCommand();
@@ -120,9 +126,32 @@ class CommitAction extends BaseAction {
   }
 
   /**
-   * 检查 GPG 签名：按全局 commit.gpgsign、脚手架 autoSign 配置、--sign/--noSign 指令决定提交是否签名
+   * autoSign 按当前分支的 remote 域名匹配私钥 UID 中的 git 地址，未匹配时沿用默认 -S
    */
-  checkSign() {
+  async getAutoSignArg() {
+    try {
+      const currentBranch = this.gitService.getCurrentBranch();
+      const remoteName = await this.gitService.getRemoteName(currentBranch);
+      const remoteHost = getRemoteHost(this.gitService.getRemoteUrl(remoteName));
+      if (!remoteHost) return '-S';
+
+      const keys = await this.runWithSpinner(
+        '正在获取 GPG 密钥列表...',
+        () => listGpgKeysAsync('sec'),
+        'GPG 密钥列表获取完成'
+      );
+      const matchedKey = keys.find((key) => parseUid(key.uid).gitHost.toLowerCase() === remoteHost);
+      return matchedKey ? `-S${matchedKey.fingerprint}` : '-S';
+    } catch (error) {
+      return '-S';
+    }
+  }
+
+  /**
+   * 检查 GPG 签名：按全局 commit.gpgsign、脚手架 autoSign 配置、--sign/--noSign 指令决定提交是否签名
+   * autoSign 开启时按 remote 匹配密钥并使用 -S<完整指纹>，未匹配时使用默认 -S
+   */
+  async checkSign() {
     // 脚手架 config（git ai gpg --auto-sign 写入本地存储）
     const autoSign = config.get('autoSign');
     // 脚手架签名指令
@@ -142,8 +171,8 @@ class CommitAction extends BaseAction {
     }
     // 说明必须签名
     if (sign || autoSign) {
-      // 提交时带上 -S
-      this.commitArgs.splice(1, 0, '-S');
+      const signArg = autoSign ? await this.getAutoSignArg() : '-S';
+      this.commitArgs.splice(1, 0, signArg);
     }
   }
 

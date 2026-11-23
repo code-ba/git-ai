@@ -74,7 +74,7 @@ git ai gpg --export         # 选择密钥导出公钥或私钥
 git ai gpg --delete         # 选择密钥删除（公钥+私钥）
 git ai gpg --default        # 设置默认签名密钥
 git ai gpg --local-default  # 为当前项目指定签名密钥
-git ai gpg --auto-sign true # 开启脚手架自动签名（等同于 git commit -S），false 关闭
+git ai gpg --auto-sign true # 开启自动签名：匹配 remote 密钥时用 -S<完整指纹>，否则用默认 -S；false 关闭
 ```
 
 临时跳过签名提交：`git ai --noSign`（等同于 `git commit --no-gpg-sign`）。

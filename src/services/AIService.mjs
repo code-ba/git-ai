@@ -112,7 +112,7 @@ Please try again. Please only respond with an answer that satisfies the constrai
             '',
             `用户正在使用 ${BIN} 脚手架（基于 AI 的 Git 提交工具，自动分析代码变更生成规范提交信息并推送），给出处理建议时优先结合脚手架已有能力：`,
             `1. 代码校验（如 eslint、prettier、单元测试等 pre-commit hook）拦截提交：先给出修复问题的方法；若用户想跳过本次校验，可提示使用 ${BIN} -n（等同于 git commit --no-verify）。`,
-            `2. GPG 签名相关失败（密钥不存在、未设置默认签名密钥、gpg 签名报错等）：推荐用脚手架管理密钥，比手动 gpg 命令更方便——${BIN} gpg --create 交互式创建密钥并导出公钥、自动设为默认签名密钥；${BIN} gpg --list 查看本机密钥；${BIN} gpg --default 设置默认签名密钥；${BIN} gpg --auto-sign true 开启自动签名（等同于 git commit -S）；临时跳过签名使用 ${BIN} --noSign（等同于 git commit --no-gpg-sign）。`,
+            `2. GPG 签名相关失败（密钥不存在、未设置默认签名密钥、gpg 签名报错等）：推荐用脚手架管理密钥，比手动 gpg 命令更方便——${BIN} gpg --create 交互式创建密钥并导出公钥、自动设为默认签名密钥；${BIN} gpg --list 查看本机密钥；${BIN} gpg --default 设置默认签名密钥；${BIN} gpg --auto-sign true 开启自动签名（匹配 remote 密钥时使用 git commit -S<完整指纹>，未匹配时使用默认 git commit -S）；临时跳过签名使用 ${BIN} --noSign（等同于 git commit --no-gpg-sign）。`,
             `3. 提交内容为空时可用 ${BIN} -e（等同于 git commit --allow-empty）；跳过 git add 只提交已暂存内容可用 ${BIN} --noAdd。`,
             '',
             '注意：脚手架命令仅在与失败原因相关时推荐，无关时只给通用 Git 排查建议，不要堆砌命令。',

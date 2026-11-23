@@ -41,11 +41,11 @@ function registerCommand() {
     .option('--local-default', '为当前项目指定签名密钥')
     .option(
       '--auto-sign [boolean]',
-      `是否开启脚手架自动签名，等同于（${chalk.cyan(
-        '`git commit -S`'
-      )}）\n需要临时跳过签名执行${chalk.cyan('`' + BIN + ' --noSign`')}）\n设置示例：${chalk.cyan(
-        '`' + BIN + ' gpg --auto-sign true`'
-      )}`,
+      `是否开启脚手架自动签名：匹配 remote 密钥时使用${chalk.cyan(
+        '`git commit -S<完整指纹>`'
+      )}，未匹配时使用默认${chalk.cyan('`git commit -S`')}\n需要临时跳过签名执行${chalk.cyan(
+        '`' + BIN + ' --noSign`'
+      )}\n设置示例：${chalk.cyan('`' + BIN + ' gpg --auto-sign true`')}`,
       (value) => (typeof value === 'boolean' ? value : String(value) === 'true'),
       autoSignDefault
     )
