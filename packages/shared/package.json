@@ -1,6 +1,6 @@
 {
   "name": "@git-ai/shared",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "git-ai 各包共用的日志、存储、Git 服务与签名密钥工具",
   "type": "module",
   "exports": {

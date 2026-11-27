@@ -1,6 +1,6 @@
 {
   "name": "@git-ai/gpg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GPG 密钥管理：创建/导出/删除密钥、设置默认签名密钥、签名提交",
   "type": "module",
   "bin": {

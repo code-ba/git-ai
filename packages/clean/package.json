@@ -1,6 +1,6 @@
 {
   "name": "@git-ai/clean",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "清理被 .gitignore 忽略却已提交的文件（本地文件保留）",
   "type": "module",
   "bin": {
