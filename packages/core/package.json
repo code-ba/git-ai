@@ -1,0 +1,43 @@
+{
+  "name": "@git-ai/core",
+  "version": "1.0.0",
+  "description": "一个基于 AI 的 Git 提交消息生成器 CLI 工具，可自动分析代码变更并生成符合规范的提交信息",
+  "type": "module",
+  "bin": {
+    "git-ai": "bin/index.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@git-ai/shared": "^1.0.0",
+    "axios": "1.13.1",
+    "chalk": "4.1.2",
+    "commander": "9.5.0",
+    "inquirer": "7.3.3"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@git-ai/clean",
+  "version": "1.0.0",
+  "description": "清理被 .gitignore 忽略却已提交的文件（本地文件保留）",
+  "type": "module",
+  "bin": {
+    "git-clear": "bin/index.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git",
+    "directory": "packages/clean"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@git-ai/shared": "^1.0.0",
+    "inquirer": "7.3.3"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@git-ai/gpg",
+  "version": "1.0.0",
+  "description": "GPG 密钥管理：创建/导出/删除密钥、设置默认签名密钥、签名提交",
+  "type": "module",
+  "bin": {
+    "git-gpg": "bin/index.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git",
+    "directory": "packages/gpg"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@git-ai/shared": "^1.0.0",
+    "chalk": "4.1.2",
+    "commander": "9.5.0",
+    "inquirer": "7.3.3"
+  }
+}

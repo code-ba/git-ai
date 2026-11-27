@@ -1,0 +1,57 @@
+{
+  "name": "@git-ai/cli",
+  "version": "2.0.9",
+  "description": "一个基于 AI 的 Git 提交消息生成器 CLI 工具，可自动分析代码变更并生成符合规范的提交信息",
+  "type": "module",
+  "bin": {
+    "git-ai": "bin/index.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "homepage": "https://github.com/code-ba/git-ai",
+  "bugs": {
+    "url": "https://github.com/code-ba/git-ai/issues",
+    "email": "info@cxvh.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": {
+    "name": "Baran",
+    "email": "info@cxvh.com",
+    "url": "https://github.com/code-ba"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('dist/postinstall.mjs')) { require('child_process').execFileSync(process.execPath, ['dist/postinstall.mjs'], { stdio: 'inherit' }); }\"",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@git-ai/clean": "^1.0.0",
+    "@git-ai/core": "^1.0.0",
+    "@git-ai/gpg": "^1.0.0",
+    "@git-ai/shared": "^1.0.0",
+    "chalk": "4.1.2",
+    "commander": "9.5.0"
+  }
+}

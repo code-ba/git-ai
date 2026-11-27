@@ -1,0 +1,40 @@
+{
+  "name": "@git-ai/shared",
+  "version": "1.0.0",
+  "description": "git-ai 各包共用的日志、存储、Git 服务与签名密钥工具",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-ba/git-ai.git",
+    "directory": "packages/shared"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs');fs.copyFileSync('src/utils/npmlog.d.ts','dist/utils/npmlog.d.ts');const d='dist/index.d.mts';let s=fs.readFileSync(d,'utf8');if(!s.includes('npmlog.d.ts')){fs.writeFileSync(d,'/// <reference path=\\\"./utils/npmlog.d.ts\\\" />\\n'+s)}\"",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "axios": "1.13.1",
+    "chalk": "4.1.2",
+    "cli-spinner": "0.2.10",
+    "configstore": "6.0.0",
+    "inquirer": "7.3.3",
+    "npmlog": "6.0.2"
+  }
+}

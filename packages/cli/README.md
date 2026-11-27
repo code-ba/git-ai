@@ -1,0 +1,179 @@
+# @git-ai/cli
+
+[![npm version](https://img.shields.io/npm/v/@git-ai/cli.svg?style=flat&logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
+[![npm downloads](https://img.shields.io/npm/dm/@git-ai/cli.svg?style=flat&logo=npm)](https://www.npmjs.com/package/@git-ai/cli)
+[![Node.js](https://img.shields.io/node/v/@git-ai/cli?style=flat&logo=nodedotjs)](https://www.npmjs.com/package/@git-ai/cli)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/code-ba/git-ai/publish.yml?style=flat&branch=main&logo=github)](https://github.com/code-ba/git-ai/actions)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat&logo=opensourceinitiative)](https://opensource.org/licenses/Apache-2.0)
+
+基于 AI 的 Git 提交消息生成器，自动分析代码变更并生成规范的 commit message。
+
+## ✨ 特性
+
+- 🤖 **AI 自动生成提交消息**
+- 🔄 **完整 Git 工作流** (add/commit/fetch/merge/push)
+- 🛡️ **冲突检测** (Git 冲突 + 代码冲突标记)
+- 🔑 **GPG 签名管理** (创建/导出/删除密钥、设置默认签名密钥、签名提交)
+- 🔍 **AI 诊断** (commit 失败时自动分析)
+- ⚙️ **灵活配置** (支持多 API/模型/密钥)
+- 🎯 **符合规范** (feat/fix/docs 等格式)
+
+## 📦 安装/更新
+
+```bash
+npm install -g @git-ai/cli
+```
+
+## 🚀 快速开始
+
+### 1. 初始化配置
+
+```bash
+git ai init
+```
+
+按提示依次完成配置：
+
+1. **请求类型**：`chat`（OpenAI 兼容，默认）/ `responses`（OpenAI Responses）/ `anthropic`（Anthropic Claude）
+2. **baseURL**：API 地址，如 `https://api.siliconflow.cn/v1`
+3. **key**：API 密钥（回显时自动掩码）
+4. **model**：从接口拉取模型列表多选（拉取失败时降级为手动输入）
+5. **max-token**：最大 token 数
+
+已配置的项会回显在输入位置上方，直接回车保持当前值；未配置的项必填。
+
+### 2. 生成提交
+
+```bash
+git ai
+```
+
+工具会自动执行：`git add` → AI 生成消息 → `git commit` → `git fetch` → `git merge` → `git push`
+
+## 📖 常用命令
+
+| 命令                      | 说明                                       |
+| ------------------------- | ------------------------------------------ |
+| `git ai`                  | 生成并提交                                 |
+| `git ai -h`               | 显示帮助信息                               |
+| `git ai -e, --allowEmpty` | 允许空提交                                 |
+| `git ai -n, --noVerify`   | 跳过 Git hooks                             |
+| `git ai --noAdd`          | 跳过 git add                               |
+| `git ai -s, --sign`       | GPG 签名提交                               |
+| `git ai -p, --pickSign`   | 提交时选择 GPG 签名密钥                    |
+| `git ai --noSign`         | 跳过 GPG 签名提交                          |
+| `git ai -m, --commit`     | commit 完成后停止，不执行 fetch/merge/push |
+| `git ai gpg`              | GPG 密钥管理                               |
+| `git ai clean`            | 清理被 .gitignore 忽略却已提交的文件       |
+| `git ai init`             | 交互式初始化/更新配置                      |
+
+## 🔑 GPG 签名管理
+
+```bash
+git ai gpg --create         # 交互式创建 GPG 密钥并导出公钥；未检测到全局默认签名密钥时自动设为默认
+git ai gpg --list           # 查看本机 GPG 密钥列表
+git ai gpg --export         # 选择密钥导出公钥或私钥
+git ai gpg --delete         # 选择密钥删除（公钥+私钥）
+git ai gpg --default        # 设置默认签名密钥，可带指纹直接设置：--default <指纹>
+git ai gpg --local-default  # 为当前项目指定签名密钥，可带指纹直接设置：--local-default <指纹>
+git ai gpg --local-empty    # 清空项目签名密钥，可带项目路径直接清空：--local-empty <项目路径>
+git ai gpg --auto-sign true # 开启签名提交：git ai 未加 -s/--sign 时自动加上 --sign；false 关闭
+```
+
+临时跳过签名提交：`git ai --noSign`（等同于 `git commit --no-gpg-sign`）。
+
+### 签名密钥的查找顺序
+
+`git ai -s`（或开启签名提交后未加 `-s/--sign`）按以下顺序确定本次提交用哪把密钥，与 git 自身的优先级一致：
+
+1. **项目密钥**：`git config --local user.signingkey`，用 `--local-default` 设置，一个项目只有一把。设置了就必须可用，否则直接报错。
+2. **全局默认签名密钥**：`git config --global user.signingkey`，用 `--default` 设置。
+3. **gpg.conf 的 default-key**：前两处都没设置时才会用到。
+
+- 脚手架只通过 `git config` 管理密钥，不读写 `gpg.conf`。`gpg.conf` 里若还有 `default-key`，对 git 不生效，相关命令会给出提示
+- 密钥列表里行尾标 `（默认）` 的是全局生效的那把
+- 全局两处配置指向不同密钥时，`-s` 会提示本次用的是哪把
+- `--delete` 只删除密钥，不改动全局配置；删除正在使用的密钥会提示如何恢复
+- 用 `--local-default` 设置过的项目会被记录；`--delete` 删除密钥时同步清空这些项目的设置，也可用 `--local-empty` 手动清空
+
+## 🧹 清理被忽略却已提交的文件
+
+```bash
+git ai clean
+```
+
+扫描已跟踪但命中 `.gitignore` 规则的文件：
+
+- 按一级目录聚合展示命中文件及数量；没有命中时提示「未检测到 .gitignore 有问题的文件」并结束
+- 询问「是否修复（从 git 索引移除，本地文件保留）？」，默认 Yes；取消则不处理
+- 确认后分批执行 `git rm --cached`，从索引移除，本地文件保留
+- 完成提示「已清理 N 个文件，本地文件已保留」
+
+## ⚙️ 配置说明
+
+### 多 API/模型支持
+
+`git ai init` 时按以下方式配置多项（随机选择）：
+
+```bash
+# baseURL 输入多个地址，英文逗号隔开
+https://api1.com/v1,https://api2.com/v1
+
+# key 输入多个密钥，英文逗号隔开
+key1,key2,key3
+
+# model 在接口列表中勾选多个
+```
+
+## 🔧 工作流程
+
+```
+检查环境 → git add → AI 生成消息 → git commit → git fetch → git merge → git push
+```
+
+## 📝 提交消息格式
+
+```
+<type>(<scope>): <subject>
+
+[详细说明]
+```
+
+**类型**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+**scope**: 由 AI 根据变更内容自动生成（模块名、文件名或功能域）
+
+**示例**:
+
+```sh
+$ git ai
+git-ai verb @git-ai/cli@2.1.0
+git-ai success 工作区状态检测完成
+git-ai success git add 执行完成
+git-ai success 暂存区文件分析完成
+git-ai success 大文件检测完成
+git-ai success 代码差异获取完成
+git-ai verb 按 Ctrl+C 退出...
+git-ai success AI 生成的内容：
+style(theme): 将 body 文字颜色设为白色
+
+在全局样式中为 body 添加 color: #ffffff，确保浅色背景下的文字可读性。
+git-ai info 本次模型消耗统计：总数 458 tokens、输入 425 tokens、输出 33 tokens
+git-ai success git commit 提交成功...
+git-ai info 获取 git 远程仓库地址
+git-ai WARN 未找到当前分支 main 的 remote 配置
+git-ai WARN 未找到当前分支 main 的 upstream 配置
+git-ai ERR! 获取 git 远程仓库地址失败，请检查 Git 是否正确配置
+git-ai ERR! 未找到任何远程仓库配置
+git-ai verb 日志地址: C:\Users\info\.config\git-ai\cli\logs\2026-11\log-2026-11-14_11-09-33.txt
+git-ai verb 本次执行指令用时: 4.800 秒，程序退出...
+```
+
+## 📋 系统要求
+
+- Node.js >= 12.20.0
+- Git >= 2.0.0
+
+## 📄 许可证
+
+Apache License 2.0

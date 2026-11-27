@@ -1,14 +1,16 @@
 node_modules/
-dist/
-build/
 coverage/
 .nyc_output/
 tmp/
 temp/
+dist/
+build/
 .eslintcache
 .vscode/
 .idea/
 .claude/
+.codebuddy/
+.tmp/
 .DS_Store
 .env
 .env.*
@@ -17,7 +19,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
-.codebuddy/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml

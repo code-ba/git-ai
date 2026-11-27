@@ -1,11 +1,12 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import axios from 'axios';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const pkgPath = path.resolve(__dirname, '../package.json');
-const lockPath = path.resolve(__dirname, '../package-lock.json');
+const repoPath = path.resolve(__dirname, '..');
+const packagesDir = path.join(repoPath, 'packages');
+const lockPath = path.join(repoPath, 'package-lock.json');
 
 const registries = ['https://registry.npmjs.org', 'https://registry.npmmirror.com'];
 
@@ -41,32 +42,41 @@ const isVersionPublished = async (name, version) => {
   throw lastError;
 };
 
-const updatePackageJson = (pkg, nextVersion) => {
+const updatePackageJson = (pkgPath, pkg, nextVersion) => {
   pkg.version = nextVersion;
   writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 };
 
-const updateLockFile = (nextVersion) => {
+const updateLockFile = (dir, nextVersion) => {
   if (!existsSync(lockPath)) return;
   const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
-  lock.version = nextVersion;
-  if (lock.packages && lock.packages['']) {
-    lock.packages[''].version = nextVersion;
+  const entry = lock.packages && lock.packages[`packages/${dir}`];
+  if (entry) {
+    entry.version = nextVersion;
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
   }
-  writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 };
 
+const listPackageDirs = () =>
+  existsSync(packagesDir)
+    ? readdirSync(packagesDir).filter((dir) => statSync(path.join(packagesDir, dir)).isDirectory())
+    : [];
+
 const main = async () => {
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-  const published = await isVersionPublished(pkg.name, pkg.version);
-  if (!published) {
-    console.log(`线上不存在版本 ${pkg.version}，无需递增`);
-    return;
+  for (const dir of listPackageDirs()) {
+    const pkgPath = path.join(packagesDir, dir, 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    if (pkg.private) continue;
+    const published = await isVersionPublished(pkg.name, pkg.version);
+    if (!published) {
+      console.log(`${pkg.name} 线上不存在版本 ${pkg.version}，无需递增`);
+      continue;
+    }
+    const nextVersion = bumpPatchVersion(pkg.version);
+    updatePackageJson(pkgPath, pkg, nextVersion);
+    updateLockFile(dir, nextVersion);
+    console.log(`${pkg.name} 版本号已自动递增至 ${nextVersion}`);
   }
-  const nextVersion = bumpPatchVersion(pkg.version);
-  updatePackageJson(pkg, nextVersion);
-  updateLockFile(nextVersion);
-  console.log(`版本号已自动递增至 ${nextVersion}`);
 };
 
 main().catch((error) => {
